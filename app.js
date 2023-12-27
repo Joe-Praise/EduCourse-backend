@@ -4,6 +4,7 @@ const morgan = require('morgan');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const AppError = require('./utils/appError');
 const globalHandlerError = require('./Controllers/errorController');
 const userRouter = require('./Routes/userRoutes');
@@ -50,6 +51,8 @@ app.use(xss());
 //     'Welcome to Building Tips! A place where all building professionals get updated on the best building practices required on the field.';
 //   res.json({ welcome });
 // });
+
+app.use(compression());
 
 // Test middleware
 app.use((req, res, next) => {
