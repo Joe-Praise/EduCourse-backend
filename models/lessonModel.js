@@ -8,6 +8,11 @@ const lessonSchema = new Schema({
     ref: 'Module',
     required: [true, 'A lesson must have a module!'],
   },
+  courseId: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'Course',
+    required: [true, 'A course module must have a course!'],
+  },
   url: {
     type: String,
     required: [true, 'A lesson must have a url'],
