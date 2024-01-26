@@ -11,7 +11,7 @@ const signToken = (id) =>
   });
 
 const createSendToken = (user, statusCode, res) => {
-  const token = signToken(user._id);
+  const token = btoa(signToken(user._id));
   const cookieOptions = {
     expires: new Date(
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000,
@@ -51,7 +51,7 @@ exports.signup = catchAsync(async (req, res, next) => {
     name: req.body.name,
     email: req.body.email,
     password: req.body.password,
-    passwordConfirm: req.body.passwordConfirm,
+    confirmPassword: req.body.confirmPassword,
     passwordChangedAt: req.body.passwordChangedAt,
     matricNumber: req.body.matricNumber,
   });
@@ -87,7 +87,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
   // 3) If so, update password
   user.password = newPassword;
-  user.passwordConfirm = confirmPassword;
+  user.confirmPassword = confirmPassword;
   await user.save();
 
   // 4) Log user in, send JWT

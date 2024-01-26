@@ -62,6 +62,7 @@ exports.getOne = (Model, popOptions) =>
     if (!doc) {
       return next(new AppError('No document found with that ID', 404));
     }
+    doc.active = undefined;
     res.status(200).json({
       status: 'success',
       data: doc,
@@ -72,6 +73,8 @@ exports.getAll = (Model) =>
   catchAsync(async (req, res, next) => {
     const doc = await Model.find();
 
+    // do not retrun active status as response
+    // doc.active = undefined;
     // SEND RESPONSE
     res.status(200).json({
       status: 'success',

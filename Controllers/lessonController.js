@@ -28,14 +28,19 @@ exports.createLesson = catchAsync(async (req, res, next) => {
 
 exports.getAllLessons = catchAsync(async (req, res, next) => {
   let lessons = [];
-  const { moduleId } = req.query;
-
-  if (moduleId) {
+  const { moduleId, courseId } = req.query;
+  if (courseId) {
+    lessons = await Lesson.find({ courseId });
+  } else if (moduleId) {
     lessons = await Lesson.find({ moduleId });
   } else {
     lessons = await Lesson.find();
   }
 
+  lessons.forEach((el) => {
+    el.active = undefined;
+  });
+  console.log(lessons);
   res.status(201).json({
     status: 'success',
     results: lessons.length,

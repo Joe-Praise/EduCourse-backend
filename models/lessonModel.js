@@ -36,6 +36,7 @@ const lessonSchema = new Schema({
 });
 
 lessonSchema.index({ moduleId: 1 });
+lessonSchema.index({ courseId: 1 });
 
 const Lesson = mongoose.model('Lesson', lessonSchema);
 module.exports = Lesson;

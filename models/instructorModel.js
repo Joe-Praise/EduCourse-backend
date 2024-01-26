@@ -8,6 +8,10 @@ const instructorSchema = new Schema({
     ref: 'User',
     required: [true, 'Instructor must be a user'],
   },
+  description: {
+    type: String,
+    required: [true, 'Instructor should have a description'],
+  },
   links: [{ type: String }],
   active: { type: Boolean, default: true, select: false },
 });
