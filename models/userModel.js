@@ -68,7 +68,7 @@ userSchema.pre('save', async function (next) {
   this.password = await bcrypt.hash(this.password, 12);
 
   // Delete passwordConfirm field. we dont need it in the DB
-  this.passwordConfirm = undefined;
+  this.confirmPassword = undefined;
   next();
 });
 

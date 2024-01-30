@@ -11,7 +11,9 @@ const signToken = (id) =>
   });
 
 const createSendToken = (user, statusCode, res) => {
-  const token = btoa(signToken(user._id));
+  // const token = btoa(signToken(user._id));
+  const token = signToken(user._id);
+
   const cookieOptions = {
     expires: new Date(
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000,
@@ -47,15 +49,17 @@ exports.restrictTo =
   };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const newUser = await User.create({
+  await User.create({
     name: req.body.name,
     email: req.body.email,
     password: req.body.password,
     confirmPassword: req.body.confirmPassword,
-    passwordChangedAt: req.body.passwordChangedAt,
-    matricNumber: req.body.matricNumber,
   });
-  createSendToken(newUser, 201, res);
+
+  res.status(201).json({
+    status: 'success',
+    message: 'User created!',
+  });
 });
 
 exports.login = catchAsync(async (req, res, next) => {
@@ -130,4 +134,9 @@ exports.Protect = catchAsync(async (req, res, next) => {
   req.user = currentUser;
 
   next();
+});
+
+exports.checkToken = catchAsync(async (req, res, next) => {
+  const { user } = req;
+  createSendToken(user, 200, res);
 });

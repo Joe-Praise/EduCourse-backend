@@ -6,6 +6,7 @@ const {
   Protect,
   restrictTo,
   updatePassword,
+  checkToken,
 } = require('../Controllers/authController');
 
 const {
@@ -32,6 +33,7 @@ router.patch('/updateMyPassword', updatePassword);
 router.get('/me', getMe, getUser);
 router.patch('/updateMe', uploadUserPhoto, resizePhoto, updateMe);
 router.delete('/deleteMe', deleteMe);
+router.get('/checkToken', checkToken);
 
 router.use(restrictTo('admin'));
 router.route('/').get(getAllUsers);

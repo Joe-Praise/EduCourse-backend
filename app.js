@@ -2,6 +2,7 @@ const path = require('path');
 const express = require('express');
 const morgan = require('morgan');
 const mongoSanitize = require('express-mongo-sanitize');
+const cors = require('cors');
 const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
@@ -18,8 +19,17 @@ const tagRouter = require('./Routes/tagRoutes');
 const blogCommentRouter = require('./Routes/blogCommentRoutes');
 const courseModuleRouter = require('./Routes/moduleRoutes');
 const lessonRouter = require('./Routes/lessonRoutes');
+const corsOptions = require('./config/corsOptions');
+const credentials = require('./utils/credentials');
 
 const app = express();
+
+// Handle options credentials check- before CORS!
+// and fetch cookies credentials requirement
+app.use(credentials);
+
+// Cross origin Resource Sharing
+app.use(cors(corsOptions));
 
 // 1) GLOBAL MIDDLEWARES
 app.use(express.static(path.join(__dirname, 'public')));
