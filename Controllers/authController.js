@@ -139,6 +139,5 @@ exports.Protect = catchAsync(async (req, res, next) => {
 
 exports.checkToken = catchAsync(async (req, res, next) => {
   const { user } = req;
-  console.log(user);
   createSendToken(user, 200, res);
 });
