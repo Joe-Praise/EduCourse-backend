@@ -28,6 +28,9 @@ const app = express();
 // and fetch cookies credentials requirement
 app.use(credentials);
 
+// Trust the 'X-Forwarded-For' header
+app.set('trust proxy', true);
+
 // Cross origin Resource Sharing
 app.use(cors(corsOptions));
 
