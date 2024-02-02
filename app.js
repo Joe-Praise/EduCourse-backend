@@ -28,9 +28,6 @@ const app = express();
 // and fetch cookies credentials requirement
 app.use(credentials);
 
-// Trust the 'X-Forwarded-For' header
-app.set('trust proxy', true);
-
 // Cross origin Resource Sharing
 app.use(cors(corsOptions));
 
@@ -49,6 +46,9 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again in an hour!',
 });
 app.use('/api', limiter);
+
+// Trust the 'X-Forwarded-For' header
+app.set('trust proxy', 1);
 
 // Body parser, reading data from body into req.body
 app.use(express.json({ limit: '10kb' }));
