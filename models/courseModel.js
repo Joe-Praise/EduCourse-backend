@@ -14,10 +14,10 @@ const courseSchema = new Schema(
       type: String,
       required: [true, 'Please provide course description!'],
     },
-    url: {
-      type: String,
-      required: [true, 'Please provide course video url!'],
-    },
+    // url: {
+    //   type: String,
+    //   required: [true, 'Please provide course video url!'],
+    // },
     imageCover: {
       type: String,
       required: [true, 'A tour must have a cover image'],

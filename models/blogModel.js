@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const slugify = require('slugify');
 
 const { Schema } = mongoose;
 
@@ -9,6 +10,7 @@ const blogSchema = new Schema(
       ref: 'Category',
       required: [true, 'A blog must have a category!'],
     },
+    slug: String,
     tag: {
       type: mongoose.Schema.ObjectId,
       ref: 'Tag',
@@ -56,5 +58,11 @@ blogSchema.pre(/^find/, function (next) {
   this.find({ active: { $ne: false } });
   next();
 });
+
+blogSchema.pre('save', function (next) {
+  this.slug = slugify(this.title, { lower: true });
+  next();
+});
+
 const Blog = mongoose.model('Blog', blogSchema);
 module.exports = Blog;

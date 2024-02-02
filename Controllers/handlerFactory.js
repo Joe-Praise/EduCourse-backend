@@ -37,8 +37,12 @@ exports.createOne = (Model, popOptions) =>
   catchAsync(async (req, res, next) => {
     // checking if the course document already exists
     if (popOptions) {
+      // getting the field value from the popOptions
       const check = popOptions.field;
+
+      // interpolating the string e.g queryStr = `req.body.title`
       const queryStr = `req.body.${[check]}`;
+
       const exists = await Model.find({ [check]: queryStr });
 
       if (exists.length) {
@@ -56,7 +60,13 @@ exports.createOne = (Model, popOptions) =>
 
 exports.getOne = (Model, popOptions) =>
   catchAsync(async (req, res, next) => {
+    // const { slug } = req.query;
+    // let query;
+    // if (slug) {
+    //   query = Model.find({ slug });
+    // } else {
     let query = Model.findById(req.params.id);
+
     if (popOptions) query = query.populate(popOptions);
     const doc = await query;
     if (!doc) {
@@ -71,7 +81,15 @@ exports.getOne = (Model, popOptions) =>
 
 exports.getAll = (Model) =>
   catchAsync(async (req, res, next) => {
-    const doc = await Model.find();
+    const { slug } = req.query;
+    let query;
+    if (slug) {
+      query = Model.find({ slug });
+    } else {
+      query = Model.find();
+    }
+
+    const doc = await query;
 
     // do not retrun active status as response
     // doc.active = undefined;

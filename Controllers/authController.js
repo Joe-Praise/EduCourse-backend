@@ -11,8 +11,8 @@ const signToken = (id) =>
   });
 
 const createSendToken = (user, statusCode, res) => {
-  // const token = btoa(signToken(user._id));
-  const token = signToken(user._id);
+  const token = btoa(signToken(user._id));
+  // const token = signToken(user._id);
 
   const cookieOptions = {
     expires: new Date(
@@ -101,6 +101,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 exports.Protect = catchAsync(async (req, res, next) => {
   // 1) Getting token and check if it's there
   let token;
+
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
@@ -138,5 +139,6 @@ exports.Protect = catchAsync(async (req, res, next) => {
 
 exports.checkToken = catchAsync(async (req, res, next) => {
   const { user } = req;
+  console.log(user);
   createSendToken(user, 200, res);
 });
