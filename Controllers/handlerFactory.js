@@ -82,21 +82,55 @@ exports.getOne = (Model, popOptions) =>
 exports.getAll = (Model) =>
   catchAsync(async (req, res, next) => {
     const { slug } = req.query;
+    let { page, limit } = req.query;
+
+    // console.log(page, limit);
     let query;
     if (slug) {
       query = Model.find({ slug });
     } else {
-      query = Model.find();
+      page = Number(page) || 1;
+      limit = Number(limit) || 6;
+
+      // handle pagonation
+      query = Model.aggregate([
+        {
+          $facet: {
+            metaData: [
+              {
+                $count: 'totalDocuments',
+              },
+              {
+                $addFields: {
+                  pageNumber: page,
+                  totalPages: {
+                    $ceil: { $divide: ['$totalDocuments', limit] },
+                  },
+                },
+              },
+            ],
+            data: [
+              {
+                $skip: (page - 1) * limit,
+              },
+              {
+                $limit: limit,
+              },
+            ],
+          },
+        },
+      ]);
     }
 
-    const doc = await query;
+    let doc = await query;
+    doc = doc[0];
+    doc.metaData = { ...doc.metaData[0], count: doc.data.length };
 
     // do not retrun active status as response
     // doc.active = undefined;
     // SEND RESPONSE
     res.status(200).json({
       status: 'success',
-      results: doc.length,
-      data: doc,
+      ...doc,
     });
   });
