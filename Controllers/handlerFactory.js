@@ -93,44 +93,59 @@ exports.getAll = (Model) =>
       limit = Number(limit) || 6;
 
       // handle pagonation
-      query = Model.aggregate([
-        {
-          $facet: {
-            metaData: [
-              {
-                $count: 'totalDocuments',
-              },
-              {
-                $addFields: {
-                  pageNumber: page,
-                  totalPages: {
-                    $ceil: { $divide: ['$totalDocuments', limit] },
-                  },
-                },
-              },
-            ],
-            data: [
-              {
-                $skip: (page - 1) * limit,
-              },
-              {
-                $limit: limit,
-              },
-            ],
-          },
-        },
-      ]);
+      //   query = Model.aggregate([
+      //     {
+      //       $facet: {
+      //         metaData: [
+      //           {
+      //             $count: 'totalDocuments',
+      //           },
+      //           {
+      //             $addFields: {
+      //               pageNumber: page,
+      //               totalPages: {
+      //                 $ceil: { $divide: ['$totalDocuments', limit] },
+      //               },
+      //             },
+      //           },
+      //         ],
+      //         data: [
+      //           {
+      //             $skip: (page - 1) * limit,
+      //           },
+      //           {
+      //             $limit: limit,
+      //           },
+      //         ],
+      //       },
+      //     },
+      //     {
+      //       $lookup:{
+
+      //       }
+      //     }
+      //   ]);
+      // }
+
+      query = Model.find()
+        .skip((page - 1) * limit)
+        .limit(limit);
+
+      const doc = await query;
+
+      const metaData = {
+        pageNumber: page,
+        count: doc.length,
+        limit,
+      };
+
+      // do not retrun active status as response
+      // doc.active = undefined;
+      // SEND RESPONSE
+      res.status(200).json({
+        status: 'success',
+        metaData,
+        doc,
+      });
     }
-
-    let doc = await query;
-    doc = doc[0];
-    doc.metaData = { ...doc.metaData[0], count: doc.data.length };
-
-    // do not retrun active status as response
-    // doc.active = undefined;
-    // SEND RESPONSE
-    res.status(200).json({
-      status: 'success',
-      ...doc,
-    });
   });

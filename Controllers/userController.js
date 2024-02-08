@@ -97,6 +97,8 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
   });
 });
 
+// exports.updateRole =
+
 exports.getAllUsers = getAll(User);
 exports.getUser = getOne(User);
 

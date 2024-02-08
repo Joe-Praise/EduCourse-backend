@@ -11,6 +11,7 @@ const instructorSchema = new Schema({
   description: {
     type: String,
     required: [true, 'Instructor should have a description'],
+    default: 'I am an instructor, i have my course coming soon',
   },
   links: [{ type: String }],
   active: { type: Boolean, default: true, select: false },

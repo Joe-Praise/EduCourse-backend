@@ -1,20 +1,43 @@
 // const User = require('../models/userModel');
 const Instructor = require('../models/instructorModel');
+const User = require('../models/userModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const filterObj = require('../utils/filterObj');
 const { getAll, updateOne, deleteOne, getOne } = require('./handlerFactory');
 
 exports.createInstructor = catchAsync(async (req, res, next) => {
-  const instructorCheck = await Instructor.find({ userId: req.user._id });
+  const admin = ['admin'];
+  const isAdmin = admin.some((el) => req.user.role.indexOf(el) !== -1);
 
+  const { userId, links } = req.body;
+
+  const query = isAdmin === true ? { userId } : { userId: req.user._id };
+
+  // if admin use userId from body else use logged in userId
+  const instructorCheck = await Instructor.find(query);
+
+  // checj for existing instructor
   if (instructorCheck.length) {
     return next(new AppError('Document already exists', 404));
   }
 
+  // get user from user collection
+  const user = await User.findById({ _id: userId });
+
+  if (!user) {
+    next(new AppError('User does not exist!', 404));
+  }
+
+  const userCopy = user._doc;
+  userCopy.role.push('instructor');
+
+  user.overwrite({ ...userCopy });
+  user.save({ validateBeforeSave: false });
+
   const instructor = await Instructor.create({
-    userId: req.body.userId,
-    links: req.body.links,
+    userId,
+    links,
   });
 
   return res.status(201).json({

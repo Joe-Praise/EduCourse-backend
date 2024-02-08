@@ -40,7 +40,9 @@ const createSendToken = (user, statusCode, res) => {
 exports.restrictTo =
   (...roles) =>
   (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    const isPermitted = roles.some((el) => req.user.role.indexOf(el) !== -1);
+
+    if (!isPermitted) {
       return next(
         new AppError('You do not have permission to perform this action!', 403),
       );

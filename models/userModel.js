@@ -18,13 +18,15 @@ const userSchema = new Schema({
     validate: [validator.isEmail, 'Please provide a valid email'],
   },
   photo: { type: String, default: 'default.jpg' },
-  role: {
-    type: String,
-    enum: {
-      values: ['user', 'instructor', 'admin'],
+  role: [
+    {
+      type: String,
+      enum: {
+        values: ['user', 'instructor', 'admin'],
+      },
+      default: 'user',
     },
-    default: 'user',
-  },
+  ],
   password: {
     type: String,
     required: [true, 'Please provide a password'],

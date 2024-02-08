@@ -20,7 +20,6 @@ const courseSchema = new Schema(
     // },
     imageCover: {
       type: String,
-      required: [true, 'A tour must have a cover image'],
     },
     level: {
       type: String,
