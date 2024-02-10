@@ -88,6 +88,13 @@ exports.getAll = (Model) =>
     let query;
     if (slug) {
       query = Model.find({ slug });
+
+      const data = await query;
+
+      res.status(200).json({
+        status: 'success',
+        data,
+      });
     } else {
       page = Number(page) || 1;
       limit = Number(limit) || 6;
@@ -145,7 +152,7 @@ exports.getAll = (Model) =>
       res.status(200).json({
         status: 'success',
         metaData,
-        doc,
+        data: doc,
       });
     }
   });
