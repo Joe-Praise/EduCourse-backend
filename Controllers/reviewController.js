@@ -1,6 +1,6 @@
 const Review = require('../models/reviewModel');
 const catchAsync = require('../utils/catchAsync');
-const { createOne, updateOne, deleteOne, getOne } = require('./handlerFactory');
+const { createOne, deleteOne, getOne } = require('./handlerFactory');
 
 exports.setCourseUserIds = catchAsync(async (req, res, next) => {
   if (!req.body.userId) req.body.userId = req.user._id;
@@ -23,8 +23,21 @@ exports.getAllReview = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.getReview = getOne(Review);
+exports.updateReview = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { courseId } = req.body;
+  const review = await Review.findById({ _id: id });
+  const doc = review._doc;
 
-exports.updateReview = updateOne(Review);
+  review.overwrite({ ...doc, courseId });
+  review.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    status: 'success',
+    data: doc,
+  });
+});
+
+exports.getReview = getOne(Review);
 
 exports.deleteReview = deleteOne(Review);

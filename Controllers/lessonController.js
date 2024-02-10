@@ -4,13 +4,18 @@ const catchAsync = require('../utils/catchAsync');
 const { getOne, updateOne, deleteOne } = require('./handlerFactory');
 
 exports.createLesson = catchAsync(async (req, res, next) => {
-  // checking if the course document already exists
+  // get all lessons for this module
   const exists = await Lesson.find({
     moduleId: req.body.moduleId,
-    title: req.body.title,
   });
 
-  if (exists.length) {
+  // check if title exists in the arr
+  const checkForExistingTitle = exists.find(
+    (el) => el.title === req.body.title,
+  );
+
+  // throw error if it exists
+  if (checkForExistingTitle) {
     return next(new AppError('Document already exists', 404));
   }
 
@@ -40,7 +45,7 @@ exports.getAllLessons = catchAsync(async (req, res, next) => {
   lessons.forEach((el) => {
     el.active = undefined;
   });
-  console.log(lessons);
+
   res.status(201).json({
     status: 'success',
     results: lessons.length,
