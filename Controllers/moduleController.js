@@ -48,6 +48,26 @@ exports.getAllModules = catchAsync(async (req, res, next) => {
   });
 });
 
+// exports.getAllLectureModules = catchAsync(async (req, res, next) => {
+//   let modules = [];
+//   const { courseId } = req.query;
+
+//   if (courseId) {
+//     modules = await Module.find({ courseId }).populate({
+//       path: 'lessons',
+//       // populate: ,
+//     });
+//   } else {
+//     modules = await Module.find();
+//   }
+
+//   res.status(201).json({
+//     status: 'success',
+//     results: modules.length,
+//     data: modules,
+//   });
+// });
+
 exports.getModule = getOne(Module);
 
 exports.updateModule = updateOne(Module);

@@ -19,6 +19,7 @@ const tagRouter = require('./Routes/tagRoutes');
 const blogCommentRouter = require('./Routes/blogCommentRoutes');
 const courseModuleRouter = require('./Routes/moduleRoutes');
 const lessonRouter = require('./Routes/lessonRoutes');
+const linkRouter = require('./Routes/linkRoutes');
 const corsOptions = require('./config/corsOptions');
 const credentials = require('./utils/credentials');
 
@@ -86,6 +87,7 @@ app.use('/api/v1/tags', tagRouter);
 app.use('/api/v1/comments', blogCommentRouter);
 app.use('/api/v1/modules', courseModuleRouter);
 app.use('/api/v1/lessons', lessonRouter);
+app.use('/api/v1/links', linkRouter);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on the server!`, 404));

@@ -18,6 +18,6 @@ router
   .get(getAllReview)
   .post(restrictTo('user'), setCourseUserIds, createReview);
 
-router.route('/:id').patch(updateReview).get(getReview).delete(deleteReview);
+router.route('/:id').get(getReview).patch(updateReview).delete(deleteReview);
 
 module.exports = router;
