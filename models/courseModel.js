@@ -55,6 +55,11 @@ const courseSchema = new Schema(
       max: [5, 'Rating must be below 5.0'],
       Set: (val) => Math.round(val * 10) / 10,
     },
+    ratingSummary: [
+      {
+        type: Number,
+      },
+    ],
     ratingsQuantity: { type: Number, default: 0 },
     price: { type: Number, required: [true, 'A course must have a price'] },
     priceDiscount: {

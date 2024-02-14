@@ -18,8 +18,13 @@ router
   .get(getAllInstructors)
   .post(Protect, restrictTo('admin', 'instructor'), createInstructor);
 
-router.patch('/updateMe', Protect, updateMe);
-router.delete('/deleteMe', Protect, deleteMe);
+router.patch('/updateMe', Protect, restrictTo('admin', 'instructor'), updateMe);
+router.delete(
+  '/deleteMe',
+  Protect,
+  restrictTo('admin', 'instructor'),
+  deleteMe,
+);
 router.delete(
   '/:id/suspendInstructor',
   Protect,

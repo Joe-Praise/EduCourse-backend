@@ -11,14 +11,25 @@ exports.setCourseUserIds = catchAsync(async (req, res, next) => {
 exports.createReview = createOne(Review);
 
 exports.getAllReview = catchAsync(async (req, res, next) => {
+  let { page, limit } = req.query;
   let filter = {};
   if (req.params.courseId) filter = { courseId: req.params.courseId };
 
-  const reviews = await Review.find(filter);
+  page = Number(page) || 1;
+  limit = Number(limit) || 3;
 
+  const reviews = await Review.find(filter)
+    .skip((page - 1) * limit)
+    .limit(limit);
+
+  const metaData = {
+    page,
+    count: reviews.length,
+    limit,
+  };
   res.status(200).json({
     status: 'success',
-    results: reviews.length,
+    metaData,
     data: reviews,
   });
 });

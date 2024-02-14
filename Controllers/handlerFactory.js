@@ -141,7 +141,7 @@ exports.getAll = (Model) =>
       const doc = await query;
 
       const metaData = {
-        pageNumber: page,
+        page,
         count: doc.length,
         limit,
       };
