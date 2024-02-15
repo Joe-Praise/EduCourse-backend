@@ -19,14 +19,25 @@ const calculatePercentage = (ratings) => {
   const aveRating = [];
 
   Object.entries(ratings).map(([key, value]) =>
-    aveRating.push({ [key]: (value / ratingsTotal) * 100 }),
+    aveRating.push({ title: key, value: (value / ratingsTotal) * 100 }),
   );
-  return aveRating;
+
+  const sortedRating = aveRating.sort(
+    (a, b) => parseInt(b.title, 10) - parseInt(a.title, 10),
+  );
+  return sortedRating;
 };
 
 const calculateRating = (array) => {
   // if no review, return
-  if (array.length < 1) return [];
+  if (array.length < 1)
+    return [
+      { title: 5, value: 0 },
+      { title: 4, value: 0 },
+      { title: 3, value: 0 },
+      { title: 2, value: 0 },
+      { title: 1, value: 0 },
+    ];
   const data = array;
 
   const starsAverage = data
@@ -80,12 +91,12 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
 
     const reviews = await Review.find({ courseId: doc[0]._id });
 
-    const averageRatings = calculateRating(reviews);
+    const ratingSummary = calculateRating(reviews);
 
     doc[0].active = undefined;
     const copy = doc[0]._doc;
 
-    const data = [{ ...copy, averageRatings }];
+    const data = [{ ...copy, ratingSummary }];
 
     res.status(200).json({
       status: 'success',
@@ -164,11 +175,11 @@ exports.getCourse = catchAsync(async (req, res, next) => {
 
   const reviews = await Review.find({ courseId: id });
 
-  const averageRatings = calculateRating(reviews);
+  const ratingSummary = calculateRating(reviews);
 
   doc.active = undefined;
   const copy = doc._doc;
-  const data = [{ ...copy, averageRatings }];
+  const data = [{ ...copy, ratingSummary }];
 
   res.status(200).json({
     status: 'success',
