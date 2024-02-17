@@ -11,13 +11,12 @@ const {
 
 const router = express.Router({ mergeParams: true });
 
-router.use(Protect);
-
 router
   .route('/')
   .get(getAllReview)
-  .post(restrictTo('user'), setCourseUserIds, createReview);
+  .post(Protect, restrictTo('user'), setCourseUserIds, createReview);
 
+router.use(Protect);
 router.route('/:id').get(getReview).patch(updateReview).delete(deleteReview);
 
 module.exports = router;

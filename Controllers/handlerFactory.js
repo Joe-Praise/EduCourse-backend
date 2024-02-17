@@ -1,6 +1,8 @@
 // const APIFeatures = require('../utils/apiFeatures');
+const APIFeatures = require('../utils/apiFeatures');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const Pagination = require('../utils/paginationFeatures');
 
 exports.deleteOne = (Model) =>
   catchAsync(async (req, res, next) => {
@@ -82,9 +84,7 @@ exports.getOne = (Model, popOptions) =>
 exports.getAll = (Model) =>
   catchAsync(async (req, res, next) => {
     const { slug } = req.query;
-    let { page, limit } = req.query;
 
-    // console.log(page, limit);
     let query;
     if (slug) {
       query = Model.find({ slug });
@@ -96,63 +96,22 @@ exports.getAll = (Model) =>
         data,
       });
     } else {
-      page = Number(page) || 1;
-      limit = Number(limit) || 0;
+      const features = new APIFeatures(Model.find(), req.query)
+        .filter()
+        .sorting()
+        .limitFields();
 
-      // handle pagonation
-      //   query = Model.aggregate([
-      //     {
-      //       $facet: {
-      //         metaData: [
-      //           {
-      //             $count: 'totalDocuments',
-      //           },
-      //           {
-      //             $addFields: {
-      //               pageNumber: page,
-      //               totalPages: {
-      //                 $ceil: { $divide: ['$totalDocuments', limit] },
-      //               },
-      //             },
-      //           },
-      //         ],
-      //         data: [
-      //           {
-      //             $skip: (page - 1) * limit,
-      //           },
-      //           {
-      //             $limit: limit,
-      //           },
-      //         ],
-      //       },
-      //     },
-      //     {
-      //       $lookup:{
+      query = await features.query;
 
-      //       }
-      //     }
-      //   ]);
-      // }
-
-      query = Model.find()
-        .skip((page - 1) * limit)
-        .limit(limit);
-
-      const doc = await query;
-
-      const metaData = {
-        page,
-        count: doc.length,
-        limit,
-      };
+      const paginate = new Pagination(req.query).pagination(query);
 
       // do not retrun active status as response
       // doc.active = undefined;
       // SEND RESPONSE
       res.status(200).json({
         status: 'success',
-        metaData,
-        data: doc,
+        metaData: paginate.metaData,
+        data: paginate.data,
       });
     }
   });
@@ -160,9 +119,9 @@ exports.getAll = (Model) =>
 exports.searchModel = (Model) =>
   catchAsync(async (req, res, next) => {
     const { search } = req.query;
-    // console.log(descriptive);
+
     const doc = await Model.find(
-      { $text: { $search: 'test' } },
+      { $text: { $search: search } },
       { score: { $meta: 'textScore' } },
     )
       .sort({ score: { $meta: 'textScore' } })
