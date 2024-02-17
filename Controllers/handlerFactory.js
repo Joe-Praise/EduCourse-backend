@@ -97,7 +97,7 @@ exports.getAll = (Model) =>
       });
     } else {
       page = Number(page) || 1;
-      limit = Number(limit) || 6;
+      limit = Number(limit) || 0;
 
       // handle pagonation
       //   query = Model.aggregate([
@@ -155,4 +155,22 @@ exports.getAll = (Model) =>
         data: doc,
       });
     }
+  });
+
+exports.searchModel = (Model) =>
+  catchAsync(async (req, res, next) => {
+    const { search } = req.query;
+    // console.log(descriptive);
+    const doc = await Model.find(
+      { $text: { $search: 'test' } },
+      { score: { $meta: 'textScore' } },
+    )
+      .sort({ score: { $meta: 'textScore' } })
+      .lean();
+
+    doc.active = undefined;
+    res.status(200).json({
+      status: 'success',
+      data: doc,
+    });
   });

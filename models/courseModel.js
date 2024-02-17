@@ -14,10 +14,6 @@ const courseSchema = new Schema(
       type: String,
       required: [true, 'Please provide course description!'],
     },
-    // url: {
-    //   type: String,
-    //   required: [true, 'Please provide course video url!'],
-    // },
     imageCover: {
       type: String,
     },
@@ -98,6 +94,9 @@ const courseSchema = new Schema(
     toObject: { virtuals: true },
   },
 );
+
+courseSchema.index({ title: 'text', category: 'text' });
+
 courseSchema.virtual('reviews', {
   ref: 'Review',
   foreignField: 'courseId',

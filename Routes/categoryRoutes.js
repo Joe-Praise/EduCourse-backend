@@ -9,8 +9,9 @@ const {
 const { Protect, restrictTo } = require('../Controllers/authController');
 
 const router = express.Router();
+router.route('/').get(getAllCategory).post(Protect, createCategory);
+
 router.use(Protect);
-router.route('/').get(getAllCategory).post(createCategory);
 
 router
   .route('/:id')

@@ -8,6 +8,7 @@ const {
   setCoverImage,
   uploadResources,
   resizePhoto,
+  searchCourses,
 } = require('../Controllers/courseController');
 const { Protect, restrictTo } = require('../Controllers/authController');
 const reviewRouter = require('./reviewRoutes');
@@ -19,6 +20,8 @@ router
   .route('/')
   .get(getAllCourses)
   .post(Protect, restrictTo('admin', 'instructor'), createCourse);
+
+router.route('/search').get(searchCourses);
 
 router.use(Protect);
 router

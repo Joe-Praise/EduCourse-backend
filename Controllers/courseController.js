@@ -1,10 +1,17 @@
 const sharp = require('sharp');
 const Course = require('../models/courseModel');
 const Review = require('../models/reviewModel');
-const { createOne, updateOne, deleteOne } = require('./handlerFactory');
+const {
+  createOne,
+  updateOne,
+  deleteOne,
+  searchModel,
+} = require('./handlerFactory');
 const upload = require('../utils/handleImageUpload');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const APIFeatures = require('../utils/apiFeatures');
+const Pagination = require('../utils/paginationFeatures');
 
 const addNumbers = (obj) => {
   const sum = Object.entries(obj).reduce((acc, [, value]) => {
@@ -80,9 +87,8 @@ const calculateRating = (array) => {
 
 exports.getAllCourses = catchAsync(async (req, res, next) => {
   const { slug } = req.query;
-  let { page, limit } = req.query;
+  // let { page, limit } = req.query;
 
-  // console.log(page, limit);
   let query;
   if (slug) {
     query = Course.find({ slug });
@@ -103,62 +109,28 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
       data,
     });
   } else {
-    page = Number(page) || 1;
-    limit = Number(limit) || 6;
+    // page = Number(page) || 1;
+    // limit = Number(limit) || 6;
 
-    // handle pagonation
-    //   query = Model.aggregate([
-    //     {
-    //       $facet: {
-    //         metaData: [
-    //           {
-    //             $count: 'totalDocuments',
-    //           },
-    //           {
-    //             $addFields: {
-    //               pageNumber: page,
-    //               totalPages: {
-    //                 $ceil: { $divide: ['$totalDocuments', limit] },
-    //               },
-    //             },
-    //           },
-    //         ],
-    //         data: [
-    //           {
-    //             $skip: (page - 1) * limit,
-    //           },
-    //           {
-    //             $limit: limit,
-    //           },
-    //         ],
-    //       },
-    //     },
-    //     {
-    //       $lookup:{
+    // query = Course.find()
+    //   .skip((page - 1) * limit)
+    //   .limit(limit);
 
-    //       }
-    //     }
-    //   ]);
-    // }
+    const features = new APIFeatures(Course.find(), req.query)
+      .filter()
+      .sorting()
+      .limitFields();
 
-    query = Course.find()
-      .skip((page - 1) * limit)
-      .limit(limit);
+    query = await features.query;
 
-    const doc = await query;
-
-    const metaData = {
-      page,
-      count: doc.length,
-      limit,
-    };
+    const paginate = new Pagination(req.query).pagination(query);
 
     // do not retrun active status as response
     // doc.active = undefined;
     res.status(200).json({
       status: 'success',
-      metaData,
-      data: doc,
+      metaData: paginate.metaData,
+      data: paginate.data,
     });
   }
 });
@@ -230,3 +202,40 @@ exports.uploadResources = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+exports.searchCourses = searchModel(Course);
+
+// handle pagonation
+//   query = Model.aggregate([
+//     {
+//       $facet: {
+//         metaData: [
+//           {
+//             $count: 'totalDocuments',
+//           },
+//           {
+//             $addFields: {
+//               pageNumber: page,
+//               totalPages: {
+//                 $ceil: { $divide: ['$totalDocuments', limit] },
+//               },
+//             },
+//           },
+//         ],
+//         data: [
+//           {
+//             $skip: (page - 1) * limit,
+//           },
+//           {
+//             $limit: limit,
+//           },
+//         ],
+//       },
+//     },
+//     {
+//       $lookup:{
+
+//       }
+//     }
+//   ]);
+// }
