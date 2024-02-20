@@ -13,12 +13,6 @@ const courseModuleSchema = new Schema(
       type: String,
       required: [true, 'A course module must have a title!'],
     },
-    // lessons: [
-    //   {
-    //     type: mongoose.Schema.ObjectId,
-    //     ref: 'Lesson',
-    //   },
-    // ],
     moduleIndex: {
       type: Number,
       required: [true, 'A course module must have a module index!'],

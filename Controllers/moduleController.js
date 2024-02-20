@@ -1,4 +1,5 @@
 const Module = require('../models/courseModuleModel');
+const CompletedCourse = require('../models/completedcourseModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const { getOne, updateOne, deleteOne } = require('./handlerFactory');
@@ -46,6 +47,30 @@ exports.getAllModules = catchAsync(async (req, res, next) => {
     results: modules.length,
     data: modules,
   });
+});
+
+exports.getLectureModules = catchAsync(async (req, res, next) => {
+  // let modules = [];
+  const { courseId } = req.query;
+
+  console.log(req.user._id);
+  const isActivated = await CompletedCourse.find({
+    courseId,
+    userId: req.user._id,
+  });
+
+  console.log(isActivated);
+  // if (isActivated) {
+  //   modules = await Module.find({ courseId });
+  // } else {
+  //   return next(new AppError('Module with that title already exists!', 404));
+  // }
+
+  // res.status(201).json({
+  //   status: 'success',
+  //   results: modules.length,
+  //   data: modules,
+  // });
 });
 
 // exports.getAllLectureModules = catchAsync(async (req, res, next) => {

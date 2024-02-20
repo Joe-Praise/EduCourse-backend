@@ -1,6 +1,7 @@
 const sharp = require('sharp');
 const Course = require('../models/courseModel');
 const Review = require('../models/reviewModel');
+const CompletedCourse = require('../models/completedcourseModel');
 const {
   createOne,
   updateOne,
@@ -87,7 +88,6 @@ const calculateRating = (array) => {
 
 exports.getAllCourses = catchAsync(async (req, res, next) => {
   const { slug } = req.query;
-  // let { page, limit } = req.query;
 
   let query;
   if (slug) {
@@ -109,13 +109,6 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
       data,
     });
   } else {
-    // page = Number(page) || 1;
-    // limit = Number(limit) || 6;
-
-    // query = Course.find()
-    //   .skip((page - 1) * limit)
-    //   .limit(limit);
-
     const features = new APIFeatures(Course.find(), req.query)
       .filter()
       .sorting()
@@ -139,6 +132,43 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
 exports.getCourse = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const path = 'reviews';
+  const doc = await Course.findById(id).populate(path);
+
+  if (!doc) {
+    return next(new AppError('No document found with that ID', 404));
+  }
+
+  const reviews = await Review.find({ courseId: id });
+
+  const ratingSummary = calculateRating(reviews);
+
+  doc.active = undefined;
+  const copy = doc._doc;
+  const data = [{ ...copy, ratingSummary }];
+
+  res.status(200).json({
+    status: 'success',
+    data,
+  });
+});
+
+exports.getLectureCourse = catchAsync(async (req, res, next) => {
+  const { userId, courseId, id } = req.params;
+  const path = 'reviews';
+
+  if (!userId && !courseId) {
+    return next(new AppError('Provide required params!', 404));
+  }
+
+  const exists = await CompletedCourse.find({
+    userId: req.body.userId,
+    courseId: req.body.courseId,
+  });
+
+  if (!exists.length) {
+    return next(new AppError('Register for course to get access!', 400));
+  }
+
   const doc = await Course.findById(id).populate(path);
 
   if (!doc) {

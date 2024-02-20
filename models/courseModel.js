@@ -95,7 +95,7 @@ const courseSchema = new Schema(
   },
 );
 
-courseSchema.index({ title: 'text', category: 'text' });
+courseSchema.index({ title: 'text' });
 
 courseSchema.virtual('reviews', {
   ref: 'Review',

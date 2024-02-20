@@ -17,10 +17,15 @@ const completedcourseSchema = new Schema(
     },
     completed: {
       type: Boolean,
+      default: false,
     },
     createdAt: {
       type: Date,
       default: Date.now(),
+    },
+    active: {
+      type: Boolean,
+      default: true,
     },
   },
   {
@@ -30,7 +35,7 @@ const completedcourseSchema = new Schema(
 );
 
 completedcourseSchema.pre(/^find/, function (next) {
-  this.find({ completed: { $ne: false } });
+  this.find({ active: { $ne: false } });
   next();
 });
 
