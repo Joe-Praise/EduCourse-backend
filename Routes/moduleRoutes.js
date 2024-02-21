@@ -6,7 +6,7 @@ const {
   getModule,
   updateModule,
   deleteModule,
-  getLectureModules,
+  // getLectureModules,
   // getAllLectureModules,
 } = require('../Controllers/moduleController');
 
@@ -16,7 +16,7 @@ router.route('/').get(getAllModules);
 router.use(Protect);
 
 // router.route('/lecture').get(getAllLectureModules);
-router.route('/lecture').get(getLectureModules);
+// router.route('/lecture').get(getLectureModules);
 
 router.route('/').post(restrictTo('admin', 'instructor'), createModule);
 

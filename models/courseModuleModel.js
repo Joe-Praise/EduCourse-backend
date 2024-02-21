@@ -17,6 +17,10 @@ const courseModuleSchema = new Schema(
       type: Number,
       required: [true, 'A course module must have a module index!'],
     },
+    section: {
+      type: String,
+      required: [true, 'A course module must have a section'],
+    },
     createdAt: {
       type: Date,
       default: Date.now(),

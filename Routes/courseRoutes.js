@@ -9,6 +9,7 @@ const {
   uploadResources,
   resizePhoto,
   searchCourses,
+  getLectureCourse,
 } = require('../Controllers/courseController');
 const { Protect, restrictTo } = require('../Controllers/authController');
 const reviewRouter = require('./reviewRoutes');
@@ -24,6 +25,7 @@ router
 router.route('/search').get(searchCourses);
 
 router.use(Protect);
+router.route('/learn/:userId/:courseId').get(getLectureCourse);
 router
   .route('/:id/resources')
   .patch(

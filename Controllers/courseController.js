@@ -153,7 +153,7 @@ exports.getCourse = catchAsync(async (req, res, next) => {
 });
 
 exports.getLectureCourse = catchAsync(async (req, res, next) => {
-  const { userId, courseId, id } = req.params;
+  const { userId, courseId } = req.params;
   const path = 'reviews';
 
   if (!userId && !courseId) {
@@ -161,21 +161,21 @@ exports.getLectureCourse = catchAsync(async (req, res, next) => {
   }
 
   const exists = await CompletedCourse.find({
-    userId: req.body.userId,
-    courseId: req.body.courseId,
+    userId,
+    courseId,
   });
 
   if (!exists.length) {
     return next(new AppError('Register for course to get access!', 400));
   }
 
-  const doc = await Course.findById(id).populate(path);
+  const doc = await Course.findById(courseId).populate(path);
 
   if (!doc) {
     return next(new AppError('No document found with that ID', 404));
   }
 
-  const reviews = await Review.find({ courseId: id });
+  const reviews = await Review.find({ courseId });
 
   const ratingSummary = calculateRating(reviews);
 
