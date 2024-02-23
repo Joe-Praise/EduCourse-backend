@@ -5,14 +5,20 @@ class APIFeatures {
     this.totalDocument = 0;
   }
 
-  filter() {
+  filter(arr = []) {
     const queryObj = { ...this.queryString };
     const excludedFields = ['page', 'sort', 'limit', 'fields'];
     excludedFields.forEach((el) => delete queryObj[el]);
 
-    if (queryObj.instructors) {
-      const instructor = queryObj.instructors.split(',');
-      queryObj.instructors = { $in: instructor };
+    if (arr.length) {
+      arr.forEach((el) => {
+        // checks if arr element is part of the queryObj
+        if (queryObj[el]) {
+          const value = queryObj[el];
+          const newValue = value.indexOf(',') !== -1 ? value.split(',') : value;
+          queryObj[el] = { $in: newValue };
+        }
+      });
     }
 
     let queryStr = JSON.stringify(queryObj);

@@ -109,8 +109,10 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
       data,
     });
   } else {
+    // used to identify fields to run mongoose reference search on
+    const referencedProperties = ['instructors', 'category'];
     const features = new APIFeatures(Course.find(), req.query)
-      .filter()
+      .filter(referencedProperties)
       .sorting()
       .limitFields();
 
