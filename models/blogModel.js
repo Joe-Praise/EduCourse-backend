@@ -11,18 +11,18 @@ const blogSchema = new Schema(
       required: [true, 'A blog must have a category!'],
     },
     slug: String,
-    tag: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Tag',
-      required: [true, 'A blog must have a tag!'],
-    },
+    tag: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Tag',
+      },
+    ],
     title: {
       type: String,
       required: [true, 'A blog must have a title!'],
     },
     imageCover: {
       type: String,
-      required: [true, 'A blog must have cover image!'],
     },
     description: {
       type: String,
@@ -56,6 +56,16 @@ blogSchema.virtual('comments', {
 
 blogSchema.pre(/^find/, function (next) {
   this.find({ active: { $ne: false } });
+
+  this.populate({
+    path: 'category',
+    select: '-__v',
+  });
+
+  this.populate({
+    path: 'tag',
+    select: '-__v',
+  });
   next();
 });
 

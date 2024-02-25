@@ -2,22 +2,58 @@ const sharp = require('sharp');
 const Blog = require('../models/blogModel');
 const catchAsync = require('../utils/catchAsync');
 const upload = require('../utils/handleImageUpload');
-const {
-  getAll,
-  getOne,
-  updateOne,
-  createOne,
-  deleteOne,
-} = require('./handlerFactory');
+const { getOne, updateOne, createOne, deleteOne } = require('./handlerFactory');
 const AppError = require('../utils/appError');
+const APIFeatures = require('../utils/apiFeatures');
+const Pagination = require('../utils/paginationFeatures');
 
 exports.createBlog = createOne(Blog, { field: 'title' });
-exports.getAllBlog = getAll(Blog);
+// exports.getAllBlog = getAll(Blog);
 exports.getBlog = getOne(Blog, { path: 'comments' });
 exports.updateBlog = updateOne(Blog);
 exports.deleteBlog = deleteOne(Blog);
 
 exports.setCoverImage = upload.single('imageCover');
+
+exports.getAllBlog = catchAsync(async (req, res, next) => {
+  const { slug } = req.query;
+
+  let query;
+  if (slug) {
+    query = Blog.find({ slug });
+
+    const doc = await query;
+
+    doc[0].active = undefined;
+    const copy = doc[0]._doc;
+
+    const data = [copy];
+
+    res.status(200).json({
+      status: 'success',
+      data,
+    });
+  } else {
+    // used to identify fields to run mongoose reference search on
+    const referencedProperties = ['category', 'tag'];
+    const features = new APIFeatures(Blog.find(), req.query)
+      .filter(referencedProperties)
+      .sorting()
+      .limitFields();
+
+    query = await features.query;
+
+    const paginate = new Pagination(req.query).pagination(query);
+
+    // do not retrun active status as response
+    // doc.active = undefined;
+    res.status(200).json({
+      status: 'success',
+      metaData: paginate.metaData,
+      data: paginate.data,
+    });
+  }
+});
 
 exports.resizePhoto = catchAsync(async (req, res, next) => {
   if (!req.file) return next();
