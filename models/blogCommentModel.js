@@ -36,6 +36,12 @@ const blogCommentSchema = new Schema(
 
 blogCommentSchema.pre(/^find/, function (next) {
   this.find({ active: { $ne: false } });
+
+  this.populate({
+    path: 'userId',
+    select: '-__v',
+  });
+
   next();
 });
 
