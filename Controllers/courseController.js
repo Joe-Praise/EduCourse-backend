@@ -87,11 +87,12 @@ const calculateRating = (array) => {
 };
 
 exports.getAllCourses = catchAsync(async (req, res, next) => {
-  const { slug } = req.query;
+  const { slug, userId } = req.query;
 
   let query;
   if (slug) {
     query = Course.find({ slug });
+    let isEnrolled = false;
 
     const doc = await query;
 
@@ -104,8 +105,17 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
 
     const data = [{ ...copy, ratingSummary }];
 
+    if (userId) {
+      const isUserEnrolled = await CompletedCourse.find({
+        userId,
+        courseId: doc[0]._id,
+      });
+      isEnrolled = !!isUserEnrolled.length;
+      console.log(isEnrolled);
+    }
     res.status(200).json({
       status: 'success',
+      isEnrolled: isEnrolled,
       data,
     });
   } else {
