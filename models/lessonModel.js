@@ -38,5 +38,10 @@ const lessonSchema = new Schema({
 lessonSchema.index({ moduleId: 1 });
 lessonSchema.index({ courseId: 1 });
 
+// userSchema.path('downloadURL').validate((val) => {
+//   urlRegex = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-/]))?/;
+//   return urlRegex.test(val);
+// }, 'Invalid URL.');
+
 const Lesson = mongoose.model('Lesson', lessonSchema);
 module.exports = Lesson;

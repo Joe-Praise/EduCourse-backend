@@ -24,10 +24,10 @@ const courseSchema = new Schema(
         message: 'Skill is either: All levels',
       },
     },
-    language: {
-      type: String,
-      required: [true, 'Course language is required!'],
-    },
+    // language: {
+    //   type: String,
+    //   required: [true, 'Course language is required!'],
+    // },
     instructors: [
       {
         type: mongoose.Schema.ObjectId,
@@ -94,8 +94,6 @@ const courseSchema = new Schema(
     toObject: { virtuals: true },
   },
 );
-
-courseSchema.index({ title: 'text' });
 
 courseSchema.virtual('reviews', {
   ref: 'Review',

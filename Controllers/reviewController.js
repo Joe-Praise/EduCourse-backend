@@ -1,5 +1,7 @@
 const Review = require('../models/reviewModel');
+const APIFeatures = require('../utils/apiFeatures');
 const catchAsync = require('../utils/catchAsync');
+const Pagination = require('../utils/paginationFeatures');
 const { createOne, deleteOne, getOne } = require('./handlerFactory');
 
 exports.setCourseUserIds = catchAsync(async (req, res, next) => {
@@ -11,26 +13,23 @@ exports.setCourseUserIds = catchAsync(async (req, res, next) => {
 exports.createReview = createOne(Review);
 
 exports.getAllReview = catchAsync(async (req, res, next) => {
-  let { page, limit } = req.query;
   let filter = {};
   if (req.params.courseId) filter = { courseId: req.params.courseId };
 
-  page = Number(page) || 1;
-  limit = Number(limit) || 3;
+  const referencedProperties = ['userId', 'courseId'];
+  const features = new APIFeatures(Review.find(filter), req.query)
+    .filter(referencedProperties)
+    .sorting()
+    .limitFields();
 
-  const reviews = await Review.find(filter)
-    .skip((page - 1) * limit)
-    .limit(limit);
+  const query = await features.query;
 
-  const metaData = {
-    page,
-    count: reviews.length,
-    limit,
-  };
+  const paginate = new Pagination(req.query).pagination(query);
+
   res.status(200).json({
     status: 'success',
-    metaData,
-    data: reviews,
+    metaData: paginate.metaData,
+    data: paginate.data,
   });
 });
 
