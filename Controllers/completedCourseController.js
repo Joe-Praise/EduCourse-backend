@@ -2,6 +2,7 @@ const CompletedCourse = require('../models/completedcourseModel');
 const APIFeatures = require('../utils/apiFeatures');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const filterObj = require('../utils/filterObj');
 const { getOne, deleteOne } = require('./handlerFactory');
 
 exports.createCompletedCourse = catchAsync(async (req, res, next) => {
@@ -64,6 +65,45 @@ exports.getAllActiveCourse = catchAsync(async (req, res, next) => {
     status: 'success',
     result: courses.length,
     data: courses,
+  });
+});
+
+exports.updateActiveCourseLessons = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const exists = await CompletedCourse.findById(id);
+  // console.log(exists);
+
+  if (!exists) {
+    return next(new AppError('Document does not exist', 400));
+  }
+
+  const filteredBody = filterObj(req.body, 'lessonsCompleted');
+
+  const documentCopy = exists._doc;
+  const data = { ...documentCopy };
+
+  const findLessonArr = data.lessonsCompleted.find((lesson) =>
+    lesson.toString().includes(filteredBody.lessonsCompleted),
+  );
+
+  if (!findLessonArr) {
+    data.lessonsCompleted.push(filteredBody.lessonsCompleted);
+    exists.overwrite({ ...data });
+    exists.save();
+  } else {
+    const updatedLessons = data.lessonsCompleted.filter(
+      (el) => !el.toString().includes(filteredBody.lessonsCompleted),
+    );
+
+    data.lessonsCompleted = updatedLessons;
+    exists.overwrite({ ...data });
+    exists.save();
+  }
+
+  res.status(200).json({
+    status: 'success',
+    result: exists.length,
+    data: exists,
   });
 });
 

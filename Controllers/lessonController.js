@@ -3,6 +3,39 @@ const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const { getOne, updateOne, deleteOne } = require('./handlerFactory');
 
+/**
+ *
+ * @param {Youtube url} url passed to the request body
+ * @returns Youtube VideoId to be saved in the backend
+ */
+const getVideoId = (url) => {
+  const urlCopy = url.split('');
+
+  const isFound = {};
+  const urlIndex = urlCopy.reduce(
+    (acc, cur, index, arr) => {
+      if (cur === '=' && isFound[cur] !== 1) {
+        isFound[cur] = 1;
+        acc.start = index + 1;
+      }
+      if (cur === '&' && isFound[cur] !== 1) {
+        isFound[cur] = 1;
+        acc.end = index;
+      }
+
+      if (!arr.includes('&')) {
+        acc.end = arr.length;
+      }
+
+      return acc;
+    },
+    { start: 0, end: 0 },
+  );
+
+  const videoId = url.slice(urlIndex.start, urlIndex.end);
+  return videoId;
+};
+
 exports.createLesson = catchAsync(async (req, res, next) => {
   // get all lessons for this module
   const exists = await Lesson.find({
@@ -19,7 +52,12 @@ exports.createLesson = catchAsync(async (req, res, next) => {
     return next(new AppError('Document already exists', 404));
   }
 
-  //   create index for ordering of modules
+  // Get the videoId Out
+  // https://www.youtube.com/watch?v=UxiLC9XFvuM&t=14s
+
+  req.body.url = getVideoId(req.body.url);
+
+  // create index for ordering of modules
   const index = exists.length + 1;
   req.body.lessonIndex = index;
 

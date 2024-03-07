@@ -11,13 +11,12 @@ const {
 
 const router = express.Router({ mergeParams: true });
 
-router.use(Protect);
-
 router
   .route('/')
   .get(getAllBlogComments)
-  .post(restrictTo('user'), setBlogId, createBlogComment);
+  .post(Protect, restrictTo('user'), setBlogId, createBlogComment);
 
+router.use(Protect);
 router
   .route('/:id')
   .get(getBlogComment)

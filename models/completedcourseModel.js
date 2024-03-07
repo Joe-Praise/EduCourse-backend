@@ -27,6 +27,12 @@ const completedcourseSchema = new Schema(
       type: Boolean,
       default: true,
     },
+    lessonsCompleted: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Lesson',
+      },
+    ],
   },
   {
     toJSON: { virtuals: true },
@@ -45,10 +51,10 @@ completedcourseSchema.pre(/^find/, function (next) {
     select: '-__v -password',
   });
 
-  this.populate({
-    path: 'courseId',
-    select: '-__v',
-  });
+  // this.populate({
+  //   path: 'courseId',
+  //   select: '-__v',
+  // });
   next();
 });
 

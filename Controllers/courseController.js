@@ -298,7 +298,6 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
         courseId: doc[0]._id,
       });
       isEnrolled = !!isUserEnrolled.length;
-      console.log(isEnrolled);
     }
     res.status(200).json({
       status: 'success',
