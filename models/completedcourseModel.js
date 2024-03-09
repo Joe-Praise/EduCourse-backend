@@ -51,11 +51,18 @@ completedcourseSchema.pre(/^find/, function (next) {
     select: '-__v -password',
   });
 
-  // this.populate({
-  //   path: 'courseId',
-  //   select: '-__v',
-  // });
+  this.populate({
+    path: 'courseId',
+    select: '-__v',
+  });
   next();
+});
+
+completedcourseSchema.post(/^find/, function () {
+  this.populate({
+    path: 'courseId',
+    select: '-__v',
+  });
 });
 
 // TODO: this should count total number of students registered to a course

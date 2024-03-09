@@ -7,6 +7,8 @@ const AppError = require('../utils/appError');
 const APIFeatures = require('../utils/apiFeatures');
 const Pagination = require('../utils/paginationFeatures');
 
+const BLOG_AUTOCOMPLETE_INDEX_NAME = 'blogAutocomplete';
+
 exports.createBlog = createOne(Blog, { field: 'title' });
 // exports.getAllBlog = getAll(Blog);
 exports.getBlog = getOne(Blog, { path: 'comments' });
@@ -14,6 +16,48 @@ exports.updateBlog = updateOne(Blog);
 exports.deleteBlog = deleteOne(Blog);
 
 exports.setCoverImage = upload.single('imageCover');
+
+exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
+  console.log('poped up');
+  const { query } = req.query;
+  const pipeline = [];
+
+  if (!query || query.length < 2) {
+    return res.status(200).json({
+      status: 'success',
+      data: [],
+    });
+  }
+
+  pipeline.push({
+    $search: {
+      index: BLOG_AUTOCOMPLETE_INDEX_NAME,
+      autocomplete: {
+        query,
+        path: 'title',
+        tokenOrder: 'sequential',
+        fuzzy: {},
+      },
+    },
+  });
+
+  pipeline.push({
+    $project: {
+      score: { $meta: 'searchScore' },
+      title: 1,
+      slug: 1,
+    },
+  });
+
+  const result = await Blog.aggregate(pipeline).sort({ score: -1 }).limit(10);
+  // const array = await result.toArray();
+  // console.log(result);
+
+  res.status(200).json({
+    status: 'success',
+    data: result,
+  });
+});
 
 exports.getAllBlog = catchAsync(async (req, res, next) => {
   const { slug } = req.query;

@@ -25,7 +25,7 @@ const Pagination = require('../utils/paginationFeatures');
 // const ATLAS_API_PRIVATE_KEY = process.env.MONGODB_ATLAS_PRIVATE_KEY;
 // const DIGEST_AUTH = `${ATLAS_API_PUBLIC_KEY}:${ATLAS_API_PRIVATE_KEY}`;
 
-const COURSE_SEARCH_INDEX = 'courseSearch';
+// const COURSE_SEARCH_INDEX = 'courseSearch';
 const COURSE_AUTOCOMPLETE_INDEX_NAME = 'courseAutocomplete';
 
 // async function findIndexByName(indexName) {
@@ -191,46 +191,46 @@ const calculateRating = (array) => {
   return averageRatings;
 };
 
-exports.atlasSearchCourse = catchAsync(async (req, res, next) => {
-  const { query } = req.query;
-  const pipeline = [];
+// exports.atlasSearchCourse = catchAsync(async (req, res, next) => {
+//   const { query } = req.query;
+//   const pipeline = [];
 
-  if (!query || query.length < 2) {
-    return res.status(200).json({
-      status: 'success',
-      data: [],
-    });
-  }
+//   if (!query || query.length < 2) {
+//     return res.status(200).json({
+//       status: 'success',
+//       data: [],
+//     });
+//   }
 
-  pipeline.push({
-    $search: {
-      index: COURSE_SEARCH_INDEX,
-      text: {
-        query,
-        path: ['title', 'description'],
-        fuzzy: {},
-      },
-    },
-  });
+//   pipeline.push({
+//     $search: {
+//       index: COURSE_SEARCH_INDEX,
+//       text: {
+//         query,
+//         path: ['title', 'description'],
+//         fuzzy: {},
+//       },
+//     },
+//   });
 
-  pipeline.push({
-    $project: {
-      score: { $meta: 'searchScore' },
-      title: 1,
-      imageCover: 1,
-      instructors: 1,
-    },
-  });
+//   pipeline.push({
+//     $project: {
+//       score: { $meta: 'searchScore' },
+//       title: 1,
+//       imageCover: 1,
+//       instructors: 1,
+//     },
+//   });
 
-  const result = await Course.aggregate(pipeline).sort({ score: -1 }).limit(10);
-  // const array = await result.toArray();
-  // console.log(result);
+//   const result = await Course.aggregate(pipeline).sort({ score: -1 }).limit(10);
+//   // const array = await result.toArray();
+//   // console.log(result);
 
-  res.status(200).json({
-    status: 'success',
-    data: result,
-  });
-});
+//   res.status(200).json({
+//     status: 'success',
+//     data: result,
+//   });
+// });
 
 exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
   const { query } = req.query;
@@ -250,6 +250,7 @@ exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
         query,
         path: 'title',
         tokenOrder: 'sequential',
+        fuzzy: {},
       },
     },
   });
@@ -259,7 +260,7 @@ exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
       score: { $meta: 'searchScore' },
       title: 1,
       imageCover: 1,
-      instructors: 1,
+      slug: 1,
     },
   });
 
@@ -384,6 +385,48 @@ exports.getLectureCourse = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     data,
+  });
+});
+
+exports.getMyLearningCourse = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return next(new AppError('Provide required params!', 404));
+  }
+
+  // get all courses user has applied for
+  const exists = await CompletedCourse.find({
+    userId,
+  });
+
+  // throw error if none is found
+  if (!exists.length) {
+    return next(
+      new AppError('Student has not registered for any course yet!', 400),
+    );
+  }
+
+  const courseArr = exists.flatMap((el) => el.courseId._id);
+
+  const features = new APIFeatures(
+    Course.find({
+      _id: { $in: courseArr },
+    }),
+    req.query,
+  )
+    .filter()
+    .sorting()
+    .limitFields();
+
+  const query = await features.query;
+
+  const paginate = new Pagination(req.query).pagination(query);
+
+  res.status(200).json({
+    status: 'success',
+    metaData: paginate.metaData,
+    data: paginate.data,
   });
 });
 

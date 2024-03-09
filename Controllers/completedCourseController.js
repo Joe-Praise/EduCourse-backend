@@ -3,6 +3,7 @@ const APIFeatures = require('../utils/apiFeatures');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const filterObj = require('../utils/filterObj');
+const Pagination = require('../utils/paginationFeatures');
 const { getOne, deleteOne } = require('./handlerFactory');
 
 exports.createCompletedCourse = catchAsync(async (req, res, next) => {
@@ -28,25 +29,23 @@ exports.createCompletedCourse = catchAsync(async (req, res, next) => {
 
 exports.getAllCompletedCourse = catchAsync(async (req, res, next) => {
   // const { userId, courseId } = req.query;
-  req.query.completed = true;
+  const { userId } = req.query;
 
-  const features = new APIFeatures(CompletedCourse.find(), req.query)
+  // req.query.completed = true;
+
+  const features = new APIFeatures(CompletedCourse.find({ userId }), req.query)
     .filter()
     .sorting()
     .limitFields();
 
   const courses = await features.query;
 
-  // const courses = await CompletedCourse.find({
-  //   userId,
-  //   courseId,
-  //   completed: true,
-  // });
+  const paginate = new Pagination(req.query).pagination(courses);
 
   res.status(200).json({
     status: 'success',
-    result: courses.length,
-    data: [...courses],
+    metaData: paginate.metaData,
+    data: paginate.data,
   });
 });
 
