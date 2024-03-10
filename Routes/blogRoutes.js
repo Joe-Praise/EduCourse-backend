@@ -9,11 +9,13 @@ const {
   setCoverImage,
   resizePhoto,
   uploadResources,
+  atlasAutocomplete,
 } = require('../Controllers/blogController');
 const blogCommentRouter = require('./blogCommentRoutes');
 
 const router = express.Router();
 router.use('/:blogId/comments', blogCommentRouter);
+router.route('/autocomplete').get(atlasAutocomplete);
 router
   .route('/')
   .get(getAllBlog)
