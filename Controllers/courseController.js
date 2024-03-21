@@ -411,24 +411,41 @@ exports.getLectureCourse = catchAsync(async (req, res, next) => {
 
 exports.getMyLearningCourse = catchAsync(async (req, res, next) => {
   const { userId } = req.params;
+  const { completed } = req.query;
 
   if (!userId) {
     return next(new AppError('Provide required params!', 404));
   }
 
-  // get all courses user has applied for
-  const exists = await CompletedCourse.find({
-    userId,
-  });
+  /**
+   * check the value of completed and assign it a queryObj according to it's value
+   */
+  let searchQuery;
+  if (completed === 'inprogress') {
+    searchQuery = {
+      userId,
+      completed: false,
+    };
+  } else if (completed === 'completed') {
+    searchQuery = {
+      userId,
+      completed: true,
+    };
+  } else {
+    searchQuery = { userId };
+  }
 
+  const exists = await CompletedCourse.find(searchQuery);
+
+  console.log(exists, searchQuery);
   // throw error if none is found
   if (!exists.length) {
-    return next(
-      new AppError('Student has not registered for any course yet!', 400),
-    );
+    return next(new AppError('No course found!', 400));
   }
 
   const courseArr = exists.flatMap((el) => el.courseId._id);
+
+  req.query.completed = undefined;
 
   const features = new APIFeatures(
     Course.find({
@@ -466,9 +483,7 @@ exports.searchModel = catchAsync(async (req, res, next) => {
 
   // throw error if none is found
   if (!exists.length) {
-    return next(
-      new AppError('Student has not registered for any course yet!', 400),
-    );
+    return next(new AppError('Could not find any course!.', 400));
   }
 
   const courseArr = exists.flatMap((el) => el.courseId._id);
