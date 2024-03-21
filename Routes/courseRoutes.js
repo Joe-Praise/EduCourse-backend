@@ -8,11 +8,12 @@ const {
   setCoverImage,
   uploadResources,
   resizePhoto,
-  searchCourses,
+  // searchCourses,
   getLectureCourse,
   // atlasSearchCourse,
   atlasAutocomplete,
   getMyLearningCourse,
+  searchModel,
 } = require('../Controllers/courseController');
 const { Protect, restrictTo } = require('../Controllers/authController');
 const reviewRouter = require('./reviewRoutes');
@@ -25,11 +26,11 @@ router
   .get(getAllCourses)
   .post(Protect, restrictTo('admin', 'instructor'), createCourse);
 
-router.route('/localSearch').get(searchCourses);
 // router.route('/search').get(atlasSearchCourse);
 router.route('/autocomplete').get(atlasAutocomplete);
 
 router.use(Protect);
+router.route('/localSearch').get(searchModel);
 router.route('/learn/:userId/:courseId').get(getLectureCourse);
 router.route('/mylearning/:userId').get(getMyLearningCourse);
 router

@@ -18,7 +18,6 @@ exports.deleteBlog = deleteOne(Blog);
 exports.setCoverImage = upload.single('imageCover');
 
 exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
-  console.log('poped up');
   const { query } = req.query;
   const pipeline = [];
 

@@ -44,6 +44,9 @@ const courseSchema = new Schema(
       type: String,
       required: [true, 'A course must have a duration'],
     },
+    totalLessons: {
+      type: Number,
+    },
     ratingsAverage: {
       type: Number,
       default: 4.5,
@@ -94,6 +97,8 @@ const courseSchema = new Schema(
     toObject: { virtuals: true },
   },
 );
+
+courseSchema.index({ title: 'text' });
 
 courseSchema.virtual('reviews', {
   ref: 'Review',

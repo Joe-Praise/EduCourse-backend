@@ -1,7 +1,9 @@
+// const { default: mongoose } = require('mongoose');
 const sharp = require('sharp');
 // const axios = require('axios');
 const Course = require('../models/courseModel');
 const Review = require('../models/reviewModel');
+const Module = require('../models/courseModuleModel');
 const CompletedCourse = require('../models/completedcourseModel');
 const {
   createOne,
@@ -233,10 +235,10 @@ const calculateRating = (array) => {
 // });
 
 exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
-  const { query } = req.query;
+  const { q } = req.query;
   const pipeline = [];
 
-  if (!query || query.length < 2) {
+  if (!q || q.length < 2) {
     return res.status(200).json({
       status: 'success',
       data: [],
@@ -247,13 +249,24 @@ exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
     $search: {
       index: COURSE_AUTOCOMPLETE_INDEX_NAME,
       autocomplete: {
-        query,
+        query: q,
         path: 'title',
         tokenOrder: 'sequential',
         fuzzy: {},
       },
     },
   });
+
+  // pipeline.push({
+  //   $match: {
+  //     _id: {
+  //       $in: [
+  //         new mongoose.Schema.ObjectId('658b21288ddbe097bcde5e93'),
+  //         new mongoose.Schema.ObjectId('65d462eacd08454eaff677af'),
+  //       ],
+  //     },
+  //   },
+  // });
 
   pipeline.push({
     $project: {
@@ -265,8 +278,6 @@ exports.atlasAutocomplete = catchAsync(async (req, res, next) => {
   });
 
   const result = await Course.aggregate(pipeline).sort({ score: -1 }).limit(10);
-  // const array = await result.toArray();
-  // console.log(result);
 
   res.status(200).json({
     status: 'success',
@@ -284,15 +295,24 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
 
     const doc = await query;
 
+    // getting all modules related to the course to get the total lessons for that course
+    // i didnt use aggregate cause lessons is pre populated when we /^find/
+    const modules = await Module.find({ courseId: doc[0]._id });
+
+    // get the total no of lessons
+    const totalLessons = modules.flatMap((lesson) => lesson.lessons).length;
+
     const reviews = await Review.find({ courseId: doc[0]._id });
 
     const ratingSummary = calculateRating(reviews);
 
+    // removing active from the fields returned
     doc[0].active = undefined;
     const copy = doc[0]._doc;
 
-    const data = [{ ...copy, ratingSummary }];
+    const data = [{ ...copy, ratingSummary, totalLessons }];
 
+    // check if user is already enrolled for the course
     if (userId) {
       const isUserEnrolled = await CompletedCourse.find({
         userId,
@@ -300,6 +320,7 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
       });
       isEnrolled = !!isUserEnrolled.length;
     }
+
     res.status(200).json({
       status: 'success',
       isEnrolled: isEnrolled,
@@ -427,6 +448,54 @@ exports.getMyLearningCourse = catchAsync(async (req, res, next) => {
     status: 'success',
     metaData: paginate.metaData,
     data: paginate.data,
+  });
+});
+
+exports.searchModel = catchAsync(async (req, res, next) => {
+  const { q } = req.query;
+  const userId = req.user._id;
+
+  if (!userId) {
+    return next(new AppError('Provide required params!', 404));
+  }
+
+  // get all courses user has applied for
+  const exists = await CompletedCourse.find({
+    userId,
+  });
+
+  // throw error if none is found
+  if (!exists.length) {
+    return next(
+      new AppError('Student has not registered for any course yet!', 400),
+    );
+  }
+
+  const courseArr = exists.flatMap((el) => el.courseId._id);
+  console.log(courseArr);
+
+  const doc = await Course.find(
+    { $and: [{ _id: { $in: courseArr } }, { $text: { $search: q } }] },
+    { score: { $meta: 'textScore' } },
+  )
+    .sort({ score: { $meta: 'textScore' } })
+    .lean();
+
+  // pipeline.push({
+  //   $match: {
+  //     _id: {
+  //       $in: [
+  //         new mongoose.Schema.ObjectId('658b21288ddbe097bcde5e93'),
+  //         new mongoose.Schema.ObjectId('65d462eacd08454eaff677af'),
+  //       ],
+  //     },
+  //   },
+  // });
+
+  doc.active = undefined;
+  res.status(200).json({
+    status: 'success',
+    data: doc,
   });
 });
 
