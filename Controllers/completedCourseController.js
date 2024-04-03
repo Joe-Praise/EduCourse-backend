@@ -6,6 +6,14 @@ const filterObj = require('../utils/filterObj');
 const Pagination = require('../utils/paginationFeatures');
 const { getOne, deleteOne } = require('./handlerFactory');
 
+exports.getRegisteredCourse = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+  const registeredCourses = await CompletedCourse.find({ userId });
+
+  req.registeredCourses = registeredCourses;
+  next();
+});
+
 exports.createCompletedCourse = catchAsync(async (req, res, next) => {
   const exists = await CompletedCourse.find({
     userId: req.body.userId,

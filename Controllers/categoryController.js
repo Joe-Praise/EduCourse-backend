@@ -1,5 +1,4 @@
 const Category = require('../models/categoryModel');
-const CompletedCourse = require('../models/completedcourseModel');
 const catchAsync = require('../utils/catchAsync');
 const {
   getAll,
@@ -12,8 +11,8 @@ const {
 exports.getAllCategory = getAll(Category);
 
 exports.getMyLearningCategory = catchAsync(async (req, res, next) => {
-  const { userId } = req.params;
-  const registeredCourses = await CompletedCourse.find({ userId });
+  // used middleware in completedCourse controller to ger this data
+  const { registeredCourses } = req;
 
   const getCategoryId = registeredCourses.map(
     (course) => course.courseId.category._id,

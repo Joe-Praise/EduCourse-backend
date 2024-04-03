@@ -86,6 +86,30 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
 
 exports.getAllInstructors = getAll(Instructor);
 
+exports.getMyLearningInstructors = catchAsync(async (req, res, next) => {
+  // used middleware in completedCourse controller to ger this data
+  const { registeredCourses } = req;
+
+  const getInstructorsId = registeredCourses
+    .map((course) => course.courseId.instructors)
+    .flatMap((el) => el);
+
+  const cache = {};
+
+  for (let i = 0; i < getInstructorsId.length; i + 1) {
+    if (!cache[getInstructorsId[i]._id]) {
+      cache[getInstructorsId[i]._id] = true;
+    }
+  }
+
+  const uniqueInstructors = Object.keys(cache);
+
+  res.status(200).json({
+    status: 'success',
+    data: uniqueInstructors,
+  });
+});
+
 exports.getOneInstructor = getOne(Instructor);
 
 exports.updateInstructor = updateOne(Instructor);

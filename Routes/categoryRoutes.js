@@ -8,12 +8,15 @@ const {
   getMyLearningCategory,
 } = require('../Controllers/categoryController');
 const { Protect, restrictTo } = require('../Controllers/authController');
+const {
+  getRegisteredCourse,
+} = require('../Controllers/completedCourseController');
 
 const router = express.Router();
 router.route('/').get(getAllCategory).post(Protect, createCategory);
 
 router.use(Protect);
-router.get('/registered/:userId', getMyLearningCategory);
+router.get('/registered/:userId', getRegisteredCourse, getMyLearningCategory);
 
 router
   .route('/:id')

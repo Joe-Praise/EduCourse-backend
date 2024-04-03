@@ -8,8 +8,12 @@ const {
   updateMe,
   deleteMe,
   suspendInstructor,
+  getMyLearningInstructors,
 } = require('../Controllers/instructorController');
 const { Protect, restrictTo } = require('../Controllers/authController');
+const {
+  getRegisteredCourse,
+} = require('../Controllers/completedCourseController');
 
 const router = express.Router();
 
@@ -30,6 +34,13 @@ router.delete(
   Protect,
   restrictTo('admin'),
   suspendInstructor,
+);
+
+router.get(
+  '/myLearningInstructors/:userId',
+  Protect,
+  getRegisteredCourse,
+  getMyLearningInstructors,
 );
 router
   .route('/:id')
