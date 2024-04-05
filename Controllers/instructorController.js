@@ -1,10 +1,22 @@
-// const User = require('../models/userModel');
 const Instructor = require('../models/instructorModel');
 const User = require('../models/userModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const filterObj = require('../utils/filterObj');
 const { getAll, updateOne, deleteOne, getOne } = require('./handlerFactory');
+
+function getUniqueInstructorId(instructors) {
+  if (!instructors.length) return [];
+  const cache = {};
+
+  for (let i = 0; i < instructors.length; i += 1) {
+    if (!cache[instructors[i]._id]) {
+      cache[instructors[i]._id] = true;
+    }
+  }
+
+  return Object.keys(cache);
+}
 
 exports.createInstructor = catchAsync(async (req, res, next) => {
   const admin = ['admin'];
@@ -94,19 +106,13 @@ exports.getMyLearningInstructors = catchAsync(async (req, res, next) => {
     .map((course) => course.courseId.instructors)
     .flatMap((el) => el);
 
-  const cache = {};
+  const uniqueInstructors = getUniqueInstructorId(getInstructorsId);
 
-  for (let i = 0; i < getInstructorsId.length; i + 1) {
-    if (!cache[getInstructorsId[i]._id]) {
-      cache[getInstructorsId[i]._id] = true;
-    }
-  }
-
-  const uniqueInstructors = Object.keys(cache);
+  const data = await Instructor.find({ _id: { $in: uniqueInstructors } });
 
   res.status(200).json({
     status: 'success',
-    data: uniqueInstructors,
+    data: data,
   });
 });
 
