@@ -1,3 +1,4 @@
+const dayjs = require('dayjs');
 const Review = require('../models/reviewModel');
 const APIFeatures = require('../utils/apiFeatures');
 const catchAsync = require('../utils/catchAsync');
@@ -26,10 +27,17 @@ exports.getAllReview = catchAsync(async (req, res, next) => {
 
   const paginate = new Pagination(req.query).pagination(query);
 
+  let doc = paginate.data;
+
+  doc = doc.map((el) => ({
+    ...el._doc,
+    createdAt: dayjs(el.createdAt).format('MMMM D, YYYY'),
+  }));
+
   res.status(200).json({
     status: 'success',
     metaData: paginate.metaData,
-    data: paginate.data,
+    data: doc,
   });
 });
 

@@ -1,6 +1,9 @@
 // const { default: mongoose } = require('mongoose');
+const dayjs = require('dayjs');
+const relativeTime = require('dayjs/plugin/relativeTime');
 const sharp = require('sharp');
 // const axios = require('axios');
+dayjs.extend(relativeTime);
 const Course = require('../models/courseModel');
 const Review = require('../models/reviewModel');
 const Module = require('../models/courseModuleModel');
@@ -310,6 +313,8 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
     doc[0].active = undefined;
     const copy = doc[0]._doc;
 
+    copy.createdAt = dayjs(doc[0].createdAt).format('MMMM D, YYYY');
+
     const data = [{ ...copy, ratingSummary, totalLessons }];
 
     // check if user is already enrolled for the course
@@ -338,12 +343,19 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
 
     const paginate = new Pagination(req.query).pagination(query);
 
+    let doc = paginate.data;
+
+    doc = doc.map((el) => ({
+      ...el._doc,
+      createdAt: dayjs(el.createdAt).format('MMMM D, YYYY'),
+    }));
+
     // do not retrun active status as response
     // doc.active = undefined;
     res.status(200).json({
       status: 'success',
       metaData: paginate.metaData,
-      data: paginate.data,
+      data: doc,
     });
   }
 });
@@ -461,10 +473,17 @@ exports.getMyLearningCourse = catchAsync(async (req, res, next) => {
 
   const paginate = new Pagination(req.query).pagination(query);
 
+  let doc = paginate.data;
+
+  doc = doc.map((el) => ({
+    ...el._doc,
+    createdAt: dayjs(el.createdAt).format('MMMM D, YYYY'),
+  }));
+
   res.status(200).json({
     status: 'success',
     metaData: paginate.metaData,
-    data: paginate.data,
+    data: doc,
   });
 });
 
@@ -507,10 +526,17 @@ exports.searchModel = catchAsync(async (req, res, next) => {
   //   },
   // });
 
+  let data = doc._doc;
+
+  data = doc.map((el) => ({
+    ...el,
+    createdAt: dayjs(el.createdAt).format('MMMM D, YYYY'),
+  }));
+
   doc.active = undefined;
   res.status(200).json({
     status: 'success',
-    data: doc,
+    data,
   });
 });
 
@@ -526,7 +552,7 @@ exports.resizePhoto = catchAsync(async (req, res, next) => {
   req.file.filename = `course-${req.user.id}-${Date.now()}.jpeg`;
 
   await sharp(req.file.buffer)
-    .resize(700, 700)
+    .resize(800, 800)
     .toFormat('jpeg')
     .jpeg({ quality: 90 })
     .toFile(`public/course/${req.file.filename}`);
