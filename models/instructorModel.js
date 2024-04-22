@@ -9,6 +9,10 @@ const instructorSchema = new Schema(
       ref: 'User',
       required: [true, 'Instructor must be a user'],
     },
+    title: {
+      type: String,
+      required: [true, 'Instructor must have a title'],
+    },
     description: {
       type: String,
       required: [true, 'Instructor should have a description'],

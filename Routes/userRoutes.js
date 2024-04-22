@@ -19,12 +19,14 @@ const {
   deleteUser,
   uploadUserPhoto,
   resizePhoto,
+  getProfile,
 } = require('../Controllers/userController');
 
 const router = express.Router();
 
 router.post('/signup', signup);
 router.post('/login', login);
+router.route('/:userId/profile').get(getProfile);
 
 // Protects all routes after this middleware
 router.use(Protect);
@@ -38,5 +40,4 @@ router.get('/checkToken', checkToken);
 router.use(restrictTo('admin'));
 router.route('/').get(getAllUsers);
 router.route('/:id').get(getUser).patch(updateUser).delete(deleteUser);
-
 module.exports = router;

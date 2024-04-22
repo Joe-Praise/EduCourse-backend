@@ -449,7 +449,6 @@ exports.getMyLearningCourse = catchAsync(async (req, res, next) => {
 
   const exists = await CompletedCourse.find(searchQuery);
 
-  // console.log(exists, searchQuery);
   // throw error if none is found
   if (!exists.length) {
     return next(new AppError('No course found!', 400));

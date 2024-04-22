@@ -1,7 +1,11 @@
 const multer = require('multer');
 const sharp = require('sharp');
 const User = require('../models/userModel');
+const Instructor = require('../models/instructorModel');
 const AppError = require('../utils/appError');
+const CompletedCourse = require('../models/completedcourseModel');
+const Course = require('../models/courseModel');
+const APIFeatures = require('../utils/apiFeatures');
 const catchAsync = require('../utils/catchAsync');
 const { getAll, getOne, updateOne, deleteOne } = require('./handlerFactory');
 const filterObj = require('../utils/filterObj');
@@ -101,6 +105,55 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
 
 exports.getAllUsers = getAll(User);
 exports.getUser = getOne(User);
+
+exports.getProfile = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+
+  const existingUser = await User.findById(userId);
+
+  if (!existingUser) {
+    return next(new AppError('User not found', 404));
+  }
+
+  if (existingUser.role.includes('admin')) {
+    const instructor = await Instructor.findOne({ userId });
+    // console.log('Instructor', instructor);
+
+    const features = new APIFeatures(
+      Course.find({ instructors: { $in: instructor._id } }),
+      '',
+    ).filter();
+
+    const courses = await features.query;
+
+    res.status(200).json({ data: { instructor, courses } });
+  } else {
+    const exists = await CompletedCourse.find({ userId });
+
+    // throw error if none is found
+    if (!exists.length) {
+      return;
+    }
+
+    const courseArr = exists.flatMap((el) => el.courseId._id);
+
+    req.query.completed = undefined;
+
+    const features = new APIFeatures(
+      Course.find({
+        _id: { $in: courseArr },
+      }),
+      req.query,
+    )
+      .filter()
+      .sorting()
+      .limitFields();
+
+    const courses = await features.query;
+
+    return res.status(200).json({ data: { user: existingUser, courses } });
+  }
+});
 
 // Do not update password with this!
 exports.updateUser = updateOne(User);
