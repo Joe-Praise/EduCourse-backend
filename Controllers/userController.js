@@ -1,5 +1,6 @@
 const multer = require('multer');
 const sharp = require('sharp');
+const dayjs = require('dayjs');
 const User = require('../models/userModel');
 const Instructor = require('../models/instructorModel');
 const AppError = require('../utils/appError');
@@ -19,6 +20,19 @@ const filterObj = require('../utils/filterObj');
 //     cb(null, `user-${req.user.id}-${Date.now()}.${ext}`);
 //   },
 // });
+
+function convertDate(obj) {
+  let coursesCopy = [...obj];
+
+  coursesCopy = coursesCopy
+    .map((el) => el._doc)
+    .map((el) => ({
+      ...el,
+      createdAt: dayjs(el.createdAt).format('MMMM D, YYYY'),
+    }));
+
+  return coursesCopy;
+}
 
 const multerStorage = multer.memoryStorage();
 
@@ -115,9 +129,10 @@ exports.getProfile = catchAsync(async (req, res, next) => {
     return next(new AppError('User not found', 404));
   }
 
-  if (existingUser.role.includes('admin')) {
+  let userDetails;
+
+  if (existingUser.role.includes('instructor')) {
     const instructor = await Instructor.findOne({ userId });
-    // console.log('Instructor', instructor);
 
     const features = new APIFeatures(
       Course.find({ instructors: { $in: instructor._id } }),
@@ -126,13 +141,22 @@ exports.getProfile = catchAsync(async (req, res, next) => {
 
     const courses = await features.query;
 
-    res.status(200).json({ data: { instructor, courses } });
-  } else {
+    userDetails = {
+      user: { ...instructor._doc },
+      courses,
+      isInstructor: true,
+    };
+  } else if (existingUser.role.includes('user')) {
     const exists = await CompletedCourse.find({ userId });
 
     // throw error if none is found
     if (!exists.length) {
-      return;
+      userDetails = {
+        user: { ...existingUser._doc },
+        courses: [],
+        isInstructor: false,
+      };
+      return res.status(200).json(userDetails);
     }
 
     const courseArr = exists.flatMap((el) => el.courseId._id);
@@ -144,15 +168,25 @@ exports.getProfile = catchAsync(async (req, res, next) => {
         _id: { $in: courseArr },
       }),
       req.query,
-    )
-      .filter()
-      .sorting()
-      .limitFields();
+    ).filter();
 
     const courses = await features.query;
 
-    return res.status(200).json({ data: { user: existingUser, courses } });
+    userDetails = {
+      user: { ...existingUser._doc },
+      courses,
+      isInstructor: false,
+    };
+  } else {
+    return next(new AppError('User not found!', 404));
   }
+  // console.log(userDetails.courses);
+
+  if (userDetails.courses) {
+    userDetails.courses = convertDate(userDetails.courses);
+  }
+
+  return res.status(200).json(userDetails);
 });
 
 // Do not update password with this!
