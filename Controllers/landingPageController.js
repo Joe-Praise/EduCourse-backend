@@ -8,8 +8,6 @@ const Instructor = require('../models/instructorModel');
 const Blog = require('../models/blogModel');
 
 const catchAsync = require('../utils/catchAsync');
-// const AppError = require('../utils/appError');
-// const APIFeatures = require('../utils/apiFeatures');
 const Pagination = require('../utils/paginationFeatures');
 
 const FetchLandingPageData = async (query, limit) => {
