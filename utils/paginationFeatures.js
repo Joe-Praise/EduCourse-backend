@@ -11,6 +11,7 @@ class Pagination {
     this.limit = this.limit * 1 || 6;
     const skip = (this.page - 1) * this.limit;
     this.data = documents.slice(skip, skip + this.limit);
+
     this.metaData = {
       totalPages: Math.ceil(documents.length / this.limit),
       totalDocuments: documents.length,

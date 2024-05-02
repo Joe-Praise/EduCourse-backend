@@ -102,12 +102,15 @@ exports.getMyLearningInstructors = catchAsync(async (req, res, next) => {
   // used middleware in completedCourse controller to ger this data
   const { registeredCourses } = req;
 
+  // Get instructors id from courses user is registered for
   const getInstructorsId = registeredCourses
     .map((course) => course.courseId.instructors)
     .flatMap((el) => el);
 
+  // Get unique id's from arr of id's
   const uniqueInstructors = getUniqueInstructorId(getInstructorsId);
 
+  // find instructors with those id's
   const data = await Instructor.find({ _id: { $in: uniqueInstructors } });
 
   res.status(200).json({

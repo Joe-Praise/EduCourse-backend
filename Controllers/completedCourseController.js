@@ -6,6 +6,7 @@ const filterObj = require('../utils/filterObj');
 const Pagination = require('../utils/paginationFeatures');
 const { getOne, deleteOne } = require('./handlerFactory');
 
+// Get courses user is registered to
 exports.getRegisteredCourse = catchAsync(async (req, res, next) => {
   const { userId } = req.params;
   const registeredCourses = await CompletedCourse.find({ userId });

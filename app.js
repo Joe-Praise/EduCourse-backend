@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const AppError = require('./utils/appError');
 const globalHandlerError = require('./Controllers/errorController');
+const landingPageRouter = require('./Routes/landingPageRoute');
 const userRouter = require('./Routes/userRoutes');
 const courseRouter = require('./Routes/courseRoutes');
 const completedCourses = require('./Routes/completedCoureseRoutes');
@@ -76,6 +77,7 @@ app.use((req, res, next) => {
 });
 
 // 2) ROUTES
+app.use('/api/v1/', landingPageRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/courses', courseRouter);
