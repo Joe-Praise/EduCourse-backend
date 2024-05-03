@@ -19,6 +19,10 @@ const instructorSchema = new Schema(
       default: 'I am an instructor, i have my course coming soon',
     },
     links: [{ type: mongoose.Schema.ObjectId, ref: 'Link' }],
+    expertise: {
+      type: String,
+      required: [true, 'Instructor expertise is required!'],
+    },
     active: { type: Boolean, default: true, select: false },
   },
   {
