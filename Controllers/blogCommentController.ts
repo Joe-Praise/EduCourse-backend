@@ -6,9 +6,7 @@ import catchAsync from '../utils/catchAsync';
 import Pagination from '../utils/paginationFeatures';
 import { createOne, getOne, updateOne, deleteOne } from './handlerFactory';
 import { formatDate } from '../utils/timeConverter';
-
-// Import CommonJS model
-const Comment = require('../models/blogCommentModel');
+import { BlogComment } from '../models/blogCommentModel.js';
 
 /**
  * Blog Comment Controller
@@ -61,7 +59,7 @@ export const getAllBlogComments = catchAsync(
     let filter: Record<string, any> = {};
     if (req.params.blogId) filter = { blogId: req.params.blogId };
 
-    const features = new APIFeatures(Comment.find(filter), req.query)
+    const features = new APIFeatures(BlogComment.find(filter), req.query)
       .filter()
       .sorting()
       .limitFields();
@@ -86,7 +84,7 @@ export const getAllBlogComments = catchAsync(
 );
 
 // CRUD operations using factory functions
-export const createBlogComment = createOne(Comment);
-export const getBlogComment = getOne(Comment);
-export const updateBlogComment = updateOne(Comment);
-export const deleteBlogComment = deleteOne(Comment);
+export const createBlogComment = createOne(BlogComment);
+export const getBlogComment = getOne(BlogComment);
+export const updateBlogComment = updateOne(BlogComment);
+export const deleteBlogComment = deleteOne(BlogComment);

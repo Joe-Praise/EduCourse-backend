@@ -8,9 +8,8 @@ import Pagination from '../utils/paginationFeatures';
 import { formatDate } from '../utils/timeConverter';
 import { getOne, updateOne, createOne, deleteOne } from './handlerFactory';
 
-// Import CommonJS modules
-const Blog = require('../models/blogModel');
-const handleImageUpload = require('../utils/handleImageUpload');
+import { Blog } from '../models/blogModel.js';
+import { handleImageUpload } from '../utils/handleImageUpload.js';
 
 /**
  * Blog Controller
