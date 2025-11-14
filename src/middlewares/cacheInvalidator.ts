@@ -27,7 +27,7 @@ export const cacheInvalidator =
               // If the pattern has no wildcard, treat as exact key
               if (!pattern.includes("*")) {
                 await redis.del(pattern);
-                console.log(`🧹 Cache cleared: ${pattern}`);
+                // console.log(`🧹 Cache cleared: ${pattern}`);
                 continue;
               }
 
@@ -50,7 +50,7 @@ export const cacheInvalidator =
                 }
               } while (cursor !== "0");
 
-              console.log(`🧹 Cleared ${totalDeleted} cache entries for pattern: ${pattern}`);
+              // console.log(`🧹 Cleared ${totalDeleted} cache entries for pattern: ${pattern}`);
             }
           } catch (error) {
             console.error("❌ Cache invalidation error:", error);

@@ -2,11 +2,18 @@ import type { Request, Response, NextFunction } from 'express';
 import  catchAsync from '../utils/catchAsync.js';
 import  AppError from '../utils/appError.js';
 import { getAll, updateOne, deleteOne, getOne } from './handlerFactory.js';
+import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
+import { cacheManager } from '../utils/cacheManager.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+import { appEvents } from '../events/index.js';
 
 // Import CommonJS modules
 import { Instructor } from "../models/instructorModel.js";
 import { User } from "../models/userModel.js";
 import filterObj from "../utils/filterObj.js";
+
+// Import cache events to register listeners
+import '../events/cache/instructorCache.events.js';
 
 // Interface for authenticated requests
 interface AuthenticatedRequest extends Request {
@@ -69,6 +76,9 @@ export const createInstructor = catchAsync(async (req: AuthenticatedRequest, res
     links,
   });
 
+  // Emit cache event for instructor creation
+  appEvents.emit(CacheEvent.INSTRUCTOR.CREATED, instructor);
+
   return res.status(201).json({
     status: 'success',
     data: instructor,
@@ -115,6 +125,8 @@ export const deleteMe = catchAsync(async (req: AuthenticatedRequest, res: Respon
 
 export const getAllInstructors = getAll(Instructor);
 
+export const getOneInstructor = getOne(Instructor);
+
 // Interface for requests with registered courses
 interface RegisteredCoursesRequest extends Request {
   registeredCourses?: Array<{
@@ -125,13 +137,32 @@ interface RegisteredCoursesRequest extends Request {
 }
 
 export const getMyLearningInstructors = catchAsync(async (req: RegisteredCoursesRequest, res: Response, next: NextFunction) => {
-  // used middleware in completedCourse controller to get this data
   const { registeredCourses } = req;
+  const userId = req.params.userId;
 
-  if (!registeredCourses) {
+  // Generate cache key for user's learning instructors
+  const cacheKey = CacheKeyBuilder.resourceKey("user-instructors", userId);
+  
+  // Try to get cached data first
+  const cachedResult = await cacheManager.get(cacheKey);
+  
+  if (cachedResult) {
     return res.status(200).json({
       status: 'success',
-      data: [],
+      data: cachedResult,
+    });
+  }
+
+  // used middleware in completedCourse controller to get this data
+  if (!registeredCourses) {
+    const emptyResult: any[] = [];
+    
+    // Cache empty result for short time to avoid repeated DB calls
+    await cacheManager.set(cacheKey, emptyResult, 60); // 1 minute TTL for empty results
+    
+    return res.status(200).json({
+      status: 'success',
+      data: emptyResult,
     });
   }
 
@@ -146,17 +177,22 @@ export const getMyLearningInstructors = catchAsync(async (req: RegisteredCourses
   // find instructors with those id's
   const data = await Instructor.find({ _id: { $in: uniqueInstructors } });
 
+  // Cache the result
+  await cacheManager.set(cacheKey, data, 300); // 5 minutes TTL
+
   res.status(200).json({
     status: 'success',
     data: data,
   });
 });
 
-export const getOneInstructor = getOne(Instructor);
+export const updateInstructor = updateOne(Instructor, { 
+  cachePattern: CacheEvent.INSTRUCTOR.UPDATED 
+});
 
-export const updateInstructor = updateOne(Instructor);
-
-export const deleteInstructor = deleteOne(Instructor);
+export const deleteInstructor = deleteOne(Instructor, { 
+  cachePattern: CacheEvent.INSTRUCTOR.DELETED 
+});
 
 // id is the particular instructor id not userId
 export const suspendInstructor = catchAsync(async (req: Request, res: Response, next: NextFunction) => {

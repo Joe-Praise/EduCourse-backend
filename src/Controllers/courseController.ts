@@ -19,6 +19,7 @@ import { CompletedCourse } from "../models/completedcourseModel.js";
 // import {cache} from '../config/cache.js';
 import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { cacheManager } from '../utils/cacheManager.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
 
 // Interface for authenticated requests
 interface AuthenticatedRequest extends Request {
@@ -143,10 +144,10 @@ export const atlasAutocomplete = catchAsync(async (req: Request, res: Response, 
 export const getAllCourses = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   const { slug, userId } = req.query;
 
-   const cacheKey = CacheKeyBuilder.listKey("course", req.query);
-   const cachedResult = await cacheManager.get(cacheKey);
-   
-    if(cachedResult){
+  const cacheKey = CacheKeyBuilder.listKey("course", req.query);
+  const cachedResult = await cacheManager.get(cacheKey);
+  
+  if(cachedResult){
     return res.status(200).json({
       status:'success',
       metaData: cachedResult.metaData,
@@ -418,40 +419,10 @@ export const searchMyLearningCourse = catchAsync(async (req: AuthenticatedReques
 });
 
 // Base CRUD operations from handlerFactory
-export const createCourse = createOne(Course, { field: 'title' });
-export const updateCourse = updateOne(Course);
-export const deleteCourse = deleteOne(Course);
+export const createCourse = createOne(Course, { field: 'title', cachePattern:CacheEvent.COURSE.CREATED});
+export const updateCourse = updateOne(Course, {cachePattern: CacheEvent.COURSE.UPDATED});
+export const deleteCourse = deleteOne(Course, {cachePattern: CacheEvent.COURSE.DELETED});
 
-// // Enhanced CRUD operations with cache invalidation
-// export const createCourse = catchAsync(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-//   // Call the original handler
-//   await baseCourseCreate(req, res, next);
-  
-//   // If response was successful, invalidate cache
-//   if (res.statusCode >= 200 && res.statusCode < 300) {
-//     await invalidateCoursesCache();
-//   }
-// });
-
-// export const updateCourse = catchAsync(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-//   // Call the original handler
-//   await baseCourseUpdate(req, res, next);
-  
-//   // If response was successful, invalidate cache
-//   if (res.statusCode >= 200 && res.statusCode < 300) {
-//     await invalidateCoursesCache();
-//   }
-// });
-
-// export const deleteCourse = catchAsync(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-//   // Call the original handler
-//   await baseCourseDelete(req, res, next);
-  
-//   // If response was successful, invalidate cache
-//   if (res.statusCode >= 200 && res.statusCode < 300) {
-//     await invalidateCoursesCache();
-//   }
-// });
 
 // Multer configuration should be defined elsewhere
 // export const setCoverImage = upload.single('imageCover');

@@ -5,12 +5,15 @@ import {CacheEvent} from './cache.events';
 
 
 appEvents.on(CacheEvent.COURSE.CREATED, async (course) => {
+  const singleKey = CacheKeyBuilder.resourceKey("courses", course._id.toString());
   const listKey = CacheKeyBuilder.listKey("courses");
+
+  await cacheManager.set(singleKey, course);
   await cacheManager.addToList(listKey, course);
 });
 
 appEvents.on(CacheEvent.COURSE.UPDATED, async (course) => {
-  const singleKey = CacheKeyBuilder.resourceKey("courses", course._id);
+  const singleKey = CacheKeyBuilder.resourceKey("courses", course._id.toString());
   const listKey = CacheKeyBuilder.listKey("courses");
 
   await cacheManager.set(singleKey, course);

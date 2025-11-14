@@ -1,9 +1,13 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { Document, Model, PopulateOptions, Query } from 'mongoose';
+import type { PopulateOptions, Query } from 'mongoose';
 import APIFeatures from '../utils/apiFeatures.js';
 import AppError from '../utils/appError.js';
 import catchAsync from '../utils/catchAsync.js';
 import Pagination from '../utils/paginationFeatures.js';
+import { appEvents } from '../events/index.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
+import { cacheManager } from '../utils/cacheManager.js';
 
 /**
  * Grade Handler Factory for CRUD operations
@@ -28,6 +32,8 @@ interface PopOptions {
   path?: string;
   select?: string;
   model?: string;
+  cachePattern?: string;
+  modelName?: string;
 }
 
 interface QueryRequest extends Request {
@@ -60,7 +66,7 @@ interface ApiResponse<T = any> {
  * Marks document as inactive instead of physical deletion for audit trails
  * @param Model - Mongoose model to operate on
  */
-export const deleteOne = (Model: MongooseModel) =>
+export const deleteOne = (Model: MongooseModel, popOptions?: PopOptions ) =>
   catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const doc = await Model.findByIdAndUpdate(
       req.params.id, 
@@ -70,6 +76,10 @@ export const deleteOne = (Model: MongooseModel) =>
 
     if (!doc) {
       return next(new AppError('No document found with that ID', 404));
+    }
+
+    if(popOptions?.cachePattern){
+      appEvents.emit(popOptions.cachePattern, doc._id);
     }
 
     const response: ApiResponse = {
@@ -84,7 +94,7 @@ export const deleteOne = (Model: MongooseModel) =>
  * Update handler with validation
  * @param Model - Mongoose model to operate on
  */
-export const updateOne = (Model: MongooseModel) =>
+export const updateOne = (Model: MongooseModel, popOptions?: PopOptions ) =>
   catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const doc = await Model.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -93,6 +103,10 @@ export const updateOne = (Model: MongooseModel) =>
 
     if (!doc) {
       return next(new AppError('No document found with that ID', 404));
+    }
+
+    if(popOptions?.cachePattern){
+      appEvents.emit( popOptions?.cachePattern, doc);
     }
 
     const response: ApiResponse = {
@@ -128,6 +142,10 @@ export const createOne = (Model: MongooseModel, popOptions?: PopOptions) =>
 
     const doc = await Model.create(req.body);
 
+    if(popOptions?.cachePattern){
+      appEvents.emit( popOptions?.cachePattern, doc);
+    }
+
     const response: ApiResponse = {
       status: 'success',
       data: doc,
@@ -141,12 +159,29 @@ export const createOne = (Model: MongooseModel, popOptions?: PopOptions) =>
  * @param Model - Mongoose model to operate on
  * @param popOptions - Population options for related documents
  */
-export const getOne = (Model: MongooseModel, popOptions?: PopulateOptions) =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    let query: any = Model.findById(req.params.id);
+export const getOne = (Model: MongooseModel, popOptions?: PopOptions) =>
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    
+    // Generate cache key - use model name if available, otherwise use 'resource'
+    const modelName = popOptions?.modelName || 'resource';
+    const cacheKey = CacheKeyBuilder.resourceKey(modelName?.toLowerCase(), id);
+    
+    // Try to get cached data
+    const cachedResult = await cacheManager.get(cacheKey);
+    
+    if (cachedResult) {
+      return res.status(200).json({
+        status: 'success',
+        data: cachedResult,
+      });
+    }
 
-    if (popOptions) {
-      query = query.populate(popOptions);
+    // If no cache, fetch from database
+    let query: any = Model.findById(id);
+
+    if (popOptions?.path) {
+      query = query.populate(popOptions.path);
     }
 
     const doc = await query;
@@ -158,6 +193,9 @@ export const getOne = (Model: MongooseModel, popOptions?: PopulateOptions) =>
     // Remove internal fields from response
     const sanitizedDoc = { ...doc.toObject() };
     delete sanitizedDoc.active;
+
+    // Cache the result
+    await cacheManager.set(cacheKey, sanitizedDoc);
 
     const response: ApiResponse = {
       status: 'success',
@@ -174,6 +212,21 @@ export const getOne = (Model: MongooseModel, popOptions?: PopulateOptions) =>
 export const getAll = (Model: MongooseModel) =>
   catchAsync(async (req: QueryRequest, res: Response, next: NextFunction): Promise<Response | void> => {
     const { slug } = req.query;
+
+    // Generate cache key - use model name if available
+    const modelName = Model.modelName || Model.collection?.name || 'resource';
+    const cacheKey = CacheKeyBuilder.listKey(modelName.toLowerCase(), req.query);
+    
+    // Try to get cached data
+    const cachedResult = await cacheManager.get(cacheKey);
+    
+    if (cachedResult) {
+      return res.status(200).json({
+        status: 'success',
+        metaData: cachedResult.metaData,
+        data: cachedResult.data,
+      });
+    }
 
     // Handle slug-based queries (for SEO-friendly URLs)
     if (slug) {
@@ -199,10 +252,18 @@ export const getAll = (Model: MongooseModel) =>
     const pagination = new Pagination(req.query);
     const paginatedResult = pagination.paginate(documents);
 
-    const response: ApiResponse = {
-      status: 'success',
+    // Prepare the complete response structure for caching
+    const responseData = {
       metaData: paginatedResult.metaData,
       data: paginatedResult.data,
+    };
+
+    // Cache the complete response structure
+    await cacheManager.set(cacheKey, responseData);
+
+    const response: ApiResponse = {
+      status: 'success',
+      ...responseData,
     };
 
     res.status(200).json(response);

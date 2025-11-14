@@ -7,9 +7,15 @@ import APIFeatures from '../utils/apiFeatures.js';
 import Pagination from '../utils/paginationFeatures.js';
 import { formatDate } from '../utils/timeConverter.js';
 import { getOne, updateOne, createOne, deleteOne } from './handlerFactory.js';
+import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
+import { cacheManager } from '../utils/cacheManager.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
 
 import { Blog } from '../models/blogModel.js';
 import handleImageUpload from '../utils/handleImageUpload.js';
+
+// Import cache events to register listeners
+import '../events/cache/blogCache.events.js';
 
 /**
  * Blog Controller
@@ -54,10 +60,17 @@ const AUTOCOMPLETE_LIMIT = 10;
 /**
  * CRUD operations using factory functions
  */
-export const createBlog = createOne(Blog, { field: 'title' });
+export const createBlog = createOne(Blog, { 
+  field: 'title', 
+  cachePattern: CacheEvent.BLOG.CREATED 
+});
 export const getBlog = getOne(Blog, { path: 'comments' });
-export const updateBlog = updateOne(Blog);
-export const deleteBlog = deleteOne(Blog);
+export const updateBlog = updateOne(Blog, { 
+  cachePattern: CacheEvent.BLOG.UPDATED 
+});
+export const deleteBlog = deleteOne(Blog, { 
+  cachePattern: CacheEvent.BLOG.DELETED 
+});
 
 /**
  * Configure multer for single image upload
@@ -131,6 +144,20 @@ export const getAllBlog = catchAsync(
   async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
     const { slug } = req.query;
 
+    // Generate cache key for the request
+    const cacheKey = CacheKeyBuilder.listKey("blog", req.query);
+    
+    // Try to get cached data first
+    const cachedResult = await cacheManager.get(cacheKey);
+    
+    if (cachedResult) {
+      return res.status(200).json({
+        status: 'success',
+        metaData: cachedResult.metaData,
+        data: cachedResult.data,
+      });
+    }
+
     // Handle single blog by slug
     if (slug) {
       const doc = await Blog.find({ slug }).lean();
@@ -146,9 +173,17 @@ export const getAllBlog = catchAsync(
         active: undefined // Remove internal field
       };
 
+      const responseData = {
+        metaData: undefined,
+        data: [formattedBlog],
+      };
+
+      // Cache the single blog result
+      await cacheManager.set(cacheKey, responseData);
+
       res.status(200).json({
         status: 'success',
-        data: [formattedBlog],
+        data: responseData.data,
       });
       return;
     }
@@ -173,10 +208,18 @@ export const getAllBlog = catchAsync(
       active: undefined // Remove internal field
     }));
 
-    res.status(200).json({
-      status: 'success',
+    // Prepare the complete response structure for caching
+    const responseData = {
       metaData: paginatedResult.metaData,
       data: formattedBlogs,
+    };
+
+    // Cache the complete response structure
+    await cacheManager.set(cacheKey, responseData);
+
+    res.status(200).json({
+      status: 'success',
+      ...responseData,
     });
   }
 );

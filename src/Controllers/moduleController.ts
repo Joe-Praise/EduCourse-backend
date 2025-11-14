@@ -2,10 +2,17 @@ import type { Request, Response, NextFunction } from 'express';
 import catchAsync from '../utils/catchAsync.js';
 import  AppError from '../utils/appError.js';
 import { getOne, updateOne, deleteOne } from './handlerFactory.js';
+import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
+import { cacheManager } from '../utils/cacheManager.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+import { appEvents } from '../events/index.js';
 
 // Import CommonJS modules
 import { CourseModule } from "../models/courseModuleModel.js";
 // import { CompletedCourse } from "../models/completedcourseModel.js";
+
+// Import cache events to register listeners
+import '../events/cache/moduleCache.events.js';
 
 export const createModule = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   // query for all modules linked to the passed course
@@ -33,6 +40,9 @@ export const createModule = catchAsync(async (req: Request, res: Response, next:
     section: req.body.section,
   });
 
+  // Emit cache event for module creation
+  appEvents.emit(CacheEvent.MODULE.CREATED, newModule);
+
   res.status(201).json({
     status: 'success',
     data: newModule,
@@ -40,14 +50,32 @@ export const createModule = catchAsync(async (req: Request, res: Response, next:
 });
 
 export const getAllModules = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  let modules: any[] = [];
   const { courseId } = req.query;
+  
+  // Generate cache key for the request
+  const cacheKey = CacheKeyBuilder.listKey("module", req.query);
+  
+  // Try to get cached data first
+  const cachedResult = await cacheManager.get(cacheKey);
+  
+  if (cachedResult) {
+    return res.status(200).json({
+      status: 'success',
+      results: cachedResult.length,
+      data: cachedResult,
+    });
+  }
+
+  let modules: any[] = [];
 
   if (courseId) {
     modules = await CourseModule.find({ courseId });
   } else {
     modules = await CourseModule.find();
   }
+
+  // Cache the result
+  await cacheManager.set(cacheKey, modules);
 
   res.status(200).json({
     status: 'success',
@@ -82,6 +110,10 @@ export const getAllModules = catchAsync(async (req: Request, res: Response, next
 
 export const getModule = getOne(CourseModule);
 
-export const updateModule = updateOne(CourseModule);
+export const updateModule = updateOne(CourseModule, { 
+  cachePattern: CacheEvent.MODULE.UPDATED 
+});
 
-export const deleteModule = deleteOne(CourseModule);
+export const deleteModule = deleteOne(CourseModule, { 
+  cachePattern: CacheEvent.MODULE.DELETED 
+});

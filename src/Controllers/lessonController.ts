@@ -2,9 +2,16 @@ import type { Request, Response, NextFunction } from 'express';
 import  catchAsync from '../utils/catchAsync.js';
 import  AppError  from '../utils/appError.js';
 import { getOne, updateOne, deleteOne } from './handlerFactory.js';
+import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
+import { cacheManager } from '../utils/cacheManager.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+import { appEvents } from '../events/index.js';
 
 // Import CommonJS modules
 import { Lesson } from "../models/lessonModel.js";
+
+// Import cache events to register listeners
+import '../events/cache/lessonCache.events.js';
 
 /**
  * Extract YouTube video ID from URL
@@ -65,6 +72,9 @@ export const createLesson = catchAsync(async (req: Request, res: Response, next:
 
   const doc = await Lesson.create(req.body);
 
+  // Emit cache event for lesson creation
+  appEvents.emit(CacheEvent.LESSON.CREATED, doc);
+
   res.status(201).json({
     status: 'success',
     data: doc,
@@ -72,8 +82,23 @@ export const createLesson = catchAsync(async (req: Request, res: Response, next:
 });
 
 export const getAllLessons = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  let lessons: any[] = [];
   const { moduleId, courseId } = req.query;
+  
+  // Generate cache key for the request
+  const cacheKey = CacheKeyBuilder.listKey("lesson", req.query);
+  
+  // Try to get cached data first
+  const cachedResult = await cacheManager.get(cacheKey);
+  
+  if (cachedResult) {
+    return res.status(200).json({
+      status: 'success',
+      results: cachedResult.length,
+      data: cachedResult,
+    });
+  }
+
+  let lessons: any[] = [];
   
   if (courseId) {
     lessons = await Lesson.find({ courseId });
@@ -87,6 +112,9 @@ export const getAllLessons = catchAsync(async (req: Request, res: Response, next
     el.active = undefined;
   });
 
+  // Cache the result
+  await cacheManager.set(cacheKey, lessons);
+
   res.status(200).json({
     status: 'success',
     results: lessons.length,
@@ -96,6 +124,10 @@ export const getAllLessons = catchAsync(async (req: Request, res: Response, next
 
 export const getLesson = getOne(Lesson);
 
-export const updateLesson = updateOne(Lesson);
+export const updateLesson = updateOne(Lesson, { 
+  cachePattern: CacheEvent.LESSON.UPDATED 
+});
 
-export const deleteLesson = deleteOne(Lesson);
+export const deleteLesson = deleteOne(Lesson, { 
+  cachePattern: CacheEvent.LESSON.DELETED 
+});
