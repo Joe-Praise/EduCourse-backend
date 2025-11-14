@@ -16,8 +16,6 @@ import {
 import { protect, requirePermission } from '../middlewares/authMiddleware.js';
 import reviewRouter from './reviewRoutes.js';
 import upload from '../utils/handleImageUpload.js';
-import { cacheInvalidator } from '../middlewares/cacheInvalidator.js';
-import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 
 const router = express.Router();
 
@@ -28,7 +26,6 @@ router
   .post(
     protect, 
     requirePermission('courses', 'create'),
-    cacheInvalidator(CacheKeyBuilder.pattern("course")),
     createCourse
   );
 
