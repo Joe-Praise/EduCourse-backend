@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx server.ts",
     "dev:watch": "tsx watch server.ts",
-    "start": "NODE_ENV=production node server.ts",
+    "start": "tsx server.ts",
+    "start:compiled": "node dist/server.js",
     "debug": "ndb server.ts",
     "build": "tsc",
     "clean": "powershell -Command \"Get-ChildItem -Path . -Include *.js,*.d.ts,*.js.map,*.d.ts.map -Recurse | Where-Object { $_.FullName -notmatch 'node_modules|public' -and $_.Name -ne 'xss-clean.d.ts' } | Remove-Item -Force\""

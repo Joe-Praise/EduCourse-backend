@@ -9,7 +9,7 @@ import { formatDate } from '../utils/timeConverter';
 import { getOne, updateOne, createOne, deleteOne } from './handlerFactory';
 
 import { Blog } from '../models/blogModel.js';
-import { handleImageUpload } from '../utils/handleImageUpload.js';
+import handleImageUpload from '../utils/handleImageUpload.js';
 
 /**
  * Blog Controller
@@ -54,10 +54,10 @@ const AUTOCOMPLETE_LIMIT = 10;
 /**
  * CRUD operations using factory functions
  */
-export const createBlog = createOne(Blog, { field: 'title' });
-export const getBlog = getOne(Blog, { path: 'comments' });
-export const updateBlog = updateOne(Blog);
-export const deleteBlog = deleteOne(Blog);
+export const createBlog = createOne(Blog as any, { field: 'title' });
+export const getBlog = getOne(Blog as any, { path: 'comments' });
+export const updateBlog = updateOne(Blog as any);
+export const deleteBlog = deleteOne(Blog as any);
 
 /**
  * Configure multer for single image upload

@@ -51,10 +51,10 @@ courseModuleSchema.virtual('lessons', {
 //   localField: '_id',
 // });
 
-courseModuleSchema.pre(/^find/, function (next) {
-  this.find({ active: { $ne: false } });
+courseModuleSchema.pre(/^find/, function (next: () => void) {
+  (this as any).find({ active: { $ne: false } });
 
-  this.populate({
+  (this as any).populate({
     path: 'lessons',
     select: '-__v',
   });

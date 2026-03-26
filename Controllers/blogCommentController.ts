@@ -84,7 +84,7 @@ export const getAllBlogComments = catchAsync(
 );
 
 // CRUD operations using factory functions
-export const createBlogComment = createOne(BlogComment);
-export const getBlogComment = getOne(BlogComment);
-export const updateBlogComment = updateOne(BlogComment);
-export const deleteBlogComment = deleteOne(BlogComment);
+export const createBlogComment = createOne(BlogComment as any);
+export const getBlogComment = getOne(BlogComment as any);
+export const updateBlogComment = updateOne(BlogComment as any);
+export const deleteBlogComment = deleteOne(BlogComment as any);
