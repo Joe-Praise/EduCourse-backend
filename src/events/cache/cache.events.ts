@@ -39,11 +39,32 @@ export const CacheEvent = {
     DELETED: "cache:lesson:deleted",
   },
   USER: {
+    CREATED: "cache:user:created",
     UPDATED: "cache:user:updated",
+    DELETED: "cache:user:deleted",
   },
   CERTIFICATE: {
     CREATED: "cache:certificate:created",
     UPDATED: "cache:certificate:updated",
     DELETED: "cache:certificate:deleted",
+  },
+  TAG: {
+    CREATED: "cache:tag:created",
+    UPDATED: "cache:tag:updated",
+    DELETED: "cache:tag:deleted",
+  },
+  BLOG_COMMENT: {
+    CREATED: "cache:blogcomment:created",
+    UPDATED: "cache:blogcomment:updated",
+    DELETED: "cache:blogcomment:deleted",
+  },
+  COMPLETED_COURSE: {
+    CREATED: "cache:completedcourse:created",
+    DELETED: "cache:completedcourse:deleted",
+  },
+  LINK: {
+    CREATED: "cache:link:created",
+    UPDATED: "cache:link:updated",
+    DELETED: "cache:link:deleted",
   },
 } as const;

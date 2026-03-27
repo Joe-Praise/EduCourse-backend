@@ -4,10 +4,15 @@ import AppError  from '../utils/appError.js';
 import APIFeatures from '../utils/apiFeatures.js';
 import Pagination from '../utils/paginationFeatures.js';
 import { getOne, deleteOne } from './handlerFactory.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+import { appEvents } from '../events/index.js';
 
 // Import CommonJS modules
 import { CompletedCourse } from "../models/completedcourseModel.js";
 import  filterObj  from "../utils/filterObj.js";
+
+// Import cache events to register listeners
+import '../events/cache/completedCourseCache.events.js';
 
 // Import the proper types
 import type { CompletedCourseDoc } from "../models/completedcourseModel.js";
@@ -40,6 +45,8 @@ export const createCompletedCourse = catchAsync(async (req: Request, res: Respon
     userId: req.body.userId,
     courseId: req.body.courseId,
   });
+
+  appEvents.emit(CacheEvent.COMPLETED_COURSE.CREATED, completedCourse);
 
   res.status(201).json({
     status: 'success',
@@ -125,7 +132,7 @@ export const updateActiveCourseLessons = catchAsync(async (req: Request, res: Re
 
 export const getOneCompletedCourse = getOne(CompletedCourse);
 
-export const deleteCompletedCourse = deleteOne(CompletedCourse);
+export const deleteCompletedCourse = deleteOne(CompletedCourse, { cachePattern: CacheEvent.COMPLETED_COURSE.DELETED });
 
 // catchAsync(async (req, res, next) => {
 //     const { id } = req.params;

@@ -10,6 +10,10 @@ import { getAll, getOne, updateOne, deleteOne } from './handlerFactory.js';
 import { formatDate } from '../utils/timeConverter.js';
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from './authController.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+
+// Import cache events to register listeners
+import '../events/cache/userCache.events.js';
 import APIFeatures from '../utils/apiFeatures.js';
 import filterObj from '../utils/filterObj.js';
 
@@ -174,5 +178,5 @@ export const getProfile = catchAsync(async (req: Request, res: Response, next: N
 });
 
 // Do not update password with this!
-export const updateUser = updateOne(User as any);
-export const deleteUser = deleteOne(User as any);
+export const updateUser = updateOne(User as any, { cachePattern: CacheEvent.USER.UPDATED });
+export const deleteUser = deleteOne(User as any, { cachePattern: CacheEvent.USER.DELETED });

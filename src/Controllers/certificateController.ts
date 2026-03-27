@@ -8,6 +8,9 @@ import {
 import { Certificate } from "../models/certificateModel.js";
 import { CacheEvent } from "../events/cache/cache.events.js";
 
+// Import cache events to register listeners
+import "../events/cache/certificateCache.events.js";
+
 export const createCertificate = createOne(Certificate, {
   cachePattern: CacheEvent.CERTIFICATE.CREATED,
 });

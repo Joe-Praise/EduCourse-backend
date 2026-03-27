@@ -21,6 +21,9 @@ import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { cacheManager } from '../utils/cacheManager.js';
 import { CacheEvent } from '../events/cache/cache.events.js';
 
+// Import cache events to register listeners
+import '../events/cache/courseCache.events.js';
+
 // Interface for authenticated requests
 interface AuthenticatedRequest extends Request {
   user?: {
