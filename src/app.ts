@@ -26,6 +26,7 @@ import blogCommentRouter from './Routes/blogCommentRoutes.js';
 import courseModuleRouter from './Routes/moduleRoutes.js';
 import lessonRouter from './Routes/lessonRoutes.js';
 import linkRouter from './Routes/linkRoutes.js';
+import certificateRouter from './Routes/certificateRoutes.js';
 import corsOptions from './config/corsOptions.js';
 import credentials from './utils/credentials.js';
 import { sessionMiddleware } from './config/redisSession.js';
@@ -112,6 +113,7 @@ app.use('/api/v1/comments', blogCommentRouter);
 app.use('/api/v1/modules', courseModuleRouter);
 app.use('/api/v1/lessons', lessonRouter);
 app.use('/api/v1/links', linkRouter);
+app.use('/api/v1/certificates', certificateRouter);
 
 app.all('*', (req: Request, res: Response, next: NextFunction) => {
   next(new AppError(`Can't find ${req.originalUrl} on the server!`, 404));

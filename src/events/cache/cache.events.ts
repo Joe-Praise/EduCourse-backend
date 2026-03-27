@@ -41,4 +41,9 @@ export const CacheEvent = {
   USER: {
     UPDATED: "cache:user:updated",
   },
+  CERTIFICATE: {
+    CREATED: "cache:certificate:created",
+    UPDATED: "cache:certificate:updated",
+    DELETED: "cache:certificate:deleted",
+  },
 } as const;
