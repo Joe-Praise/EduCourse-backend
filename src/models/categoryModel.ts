@@ -8,40 +8,40 @@ import {
   Query
 } from "mongoose";
 
-/**
- * 1. Define schema (single source of truth)
- */
-const categorySchema = new Schema({
-  name: {
-    type: String,
-    required: [true, 'A category must have a name'],
-  },
-  group: {
-    type: String,
-    required: [true, 'category is required!'],
-    enum: {
-      values: ['course', 'blog'],
-      message: 'group is either: course, blog',
+const categorySchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: [true, 'A category must have a name'],
+    },
+    group: {
+      type: String,
+      required: [true, 'category is required!'],
+      enum: {
+        values: ['course', 'blog'],
+        message: 'group is either: course, blog',
+      },
+    },
+    active: {
+      type: Boolean,
+      default: true,
+      select: false,
     },
   },
-  active: {
-    type: Boolean,
-    default: true,
-    select: false,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { timestamps: true },
+);
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type CategoryType = InferSchemaType<typeof categorySchema> & { _id: Types.ObjectId }
+type CategoryType = InferSchemaType<typeof categorySchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface CategoryMethods {
   isCourseCategory(this: CategoryDoc): boolean;
@@ -49,7 +49,7 @@ interface CategoryMethods {
 }
 
 /**
- * 4. Define statics (optional)
+ * Statics
  */
 interface CategoryStatics {
   findByGroup(this: CategoryModel, group: 'course' | 'blog'): Promise<CategoryDoc[]>;
@@ -57,14 +57,11 @@ interface CategoryStatics {
   findBlogCategories(this: CategoryModel): Promise<CategoryDoc[]>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type CategoryDoc = HydratedDocument<CategoryType, CategoryMethods>;
 type CategoryModel = Model<CategoryType, {}, CategoryMethods> & CategoryStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 categorySchema.methods.isCourseCategory = function (this: CategoryDoc) {
   return this.group === 'course';
@@ -75,7 +72,7 @@ categorySchema.methods.isBlogCategory = function (this: CategoryDoc) {
 };
 
 /**
- * 7. Add statics
+ * Statics
  */
 categorySchema.statics.findByGroup = function (group: 'course' | 'blog') {
   return this.find({ group });
@@ -90,22 +87,19 @@ categorySchema.statics.findBlogCategories = function () {
 };
 
 /**
- * 8. Add indexes
+ * Indexes
  */
 categorySchema.index({ name: 1, group: 1 }, { unique: true });
 categorySchema.index({ group: 1 });
 
 /**
- * 9. Middleware (typed this)
+ * Middleware
  */
 categorySchema.pre<Query<CategoryDoc[], CategoryDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
   next();
 });
 
-/**
- * 10. Export model
- */
 const Category = model<CategoryType, CategoryModel>("Category", categorySchema);
 
 export { Category, CategoryType, CategoryDoc, CategoryModel };

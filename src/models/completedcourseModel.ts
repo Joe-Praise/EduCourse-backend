@@ -9,9 +9,6 @@ import {
 } from 'mongoose';
 import { Course } from './courseModel.js';
 
-/**
- * 1. Define schema (single source of truth)
- */
 const completedcourseSchema = new Schema(
   {
     userId: {
@@ -28,10 +25,6 @@ const completedcourseSchema = new Schema(
       type: Boolean,
       default: false,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
     active: {
       type: Boolean,
       default: true,
@@ -44,18 +37,23 @@ const completedcourseSchema = new Schema(
     ],
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type CompletedCourseType = InferSchemaType<typeof completedcourseSchema> & { _id: Types.ObjectId };
+type CompletedCourseType = InferSchemaType<typeof completedcourseSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface CompletedCourseMethods {
   getTotalLessonsCompleted(this: CompletedCourseDoc): number;
@@ -63,7 +61,7 @@ interface CompletedCourseMethods {
 }
 
 /**
- * 4. Define statics
+ * Statics
  */
 interface CompletedCourseStatics {
   totalNumberOfStudents(courseId: Types.ObjectId): Promise<void>;
@@ -71,44 +69,38 @@ interface CompletedCourseStatics {
   findByUser(userId: string): Promise<CompletedCourseDoc[]>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type CompletedCourseDoc = HydratedDocument<CompletedCourseType, CompletedCourseMethods>;
-type CompletedCourseModel = Model<CompletedCourseType, {}, CompletedCourseMethods> & CompletedCourseStatics;
+type CompletedCourseModel = Model<CompletedCourseType, {}, CompletedCourseMethods> &
+  CompletedCourseStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 completedcourseSchema.methods.getTotalLessonsCompleted = function (this: CompletedCourseDoc) {
   return this.lessonsCompleted.length;
 };
 
-completedcourseSchema.methods.getCompletionPercentage = function (this: CompletedCourseDoc, totalLessons: number) {
+completedcourseSchema.methods.getCompletionPercentage = function (
+  this: CompletedCourseDoc,
+  totalLessons: number,
+) {
   if (totalLessons === 0) return 0;
   return Math.round((this.lessonsCompleted.length / totalLessons) * 100);
 };
 
 /**
- * 7. Add statics
+ * Statics
  */
 completedcourseSchema.statics.totalNumberOfStudents = async function (
   courseId: Types.ObjectId,
 ): Promise<void> {
   const stats = await this.aggregate([
-    {
-      $match: { courseId },
-    },
-    {
-      $count: 'studentsQuantity',
-    },
+    { $match: { courseId } },
+    { $count: 'studentsQuantity' },
   ]);
 
   const studentsQuantity = stats.length > 0 ? stats[0].studentsQuantity : 0;
-  
-  await Course.findByIdAndUpdate(courseId, {
-    studentsQuantity,
-  });
+  await Course.findByIdAndUpdate(courseId, { studentsQuantity });
 };
 
 completedcourseSchema.statics.findByCourse = function (courseId: string) {
@@ -120,64 +112,56 @@ completedcourseSchema.statics.findByUser = function (userId: string) {
 };
 
 /**
- * 8. Add indexes
+ * Indexes
  */
 completedcourseSchema.index({ userId: 1, courseId: 1 }, { unique: true });
 completedcourseSchema.index({ courseId: 1 });
 completedcourseSchema.index({ userId: 1 });
 
 /**
- * 9. Add middleware (typed this)
+ * Middleware — single pre-find hook: filter inactive + populate
  */
-completedcourseSchema.pre(/^find/, function (this: Query<CompletedCourseDoc, CompletedCourseDoc>) {
-  this.find({ active: { $ne: false } });
-});
-
-completedcourseSchema.pre(/^find/, function (this: Query<CompletedCourseDoc, CompletedCourseDoc>) {
-  this.populate({
-    path: 'userId',
-    select: '-__v -password',
-  });
-
-  this.populate({
-    path: 'courseId',
-    select: '-__v',
-  });
-});
-
-completedcourseSchema.post(/^find/, function (this: Query<CompletedCourseDoc, CompletedCourseDoc>) {
-  this.populate({
-    path: 'courseId',
-    select: '-__v',
-  });
-});
+completedcourseSchema.pre<Query<CompletedCourseDoc[], CompletedCourseDoc>>(
+  /^find/,
+  function (next) {
+    this.find({ active: { $ne: false } });
+    this.populate({ path: 'userId', select: '-__v -password' });
+    this.populate({ path: 'courseId', select: '-__v' });
+    next();
+  },
+);
 
 /**
- * 10. Add post-save middleware for automatic student count updates
+ * Post-save hook: update denormalised student count on Course
  */
 completedcourseSchema.post('save', function (this: CompletedCourseDoc) {
   (this.constructor as CompletedCourseModel).totalNumberOfStudents(this.courseId);
 });
 
-completedcourseSchema.pre<Query<CompletedCourseDoc, CompletedCourseDoc>>(/^findOneAnd/, async function () {
-  (this as any).r = await this.clone().findOne();
-});
+completedcourseSchema.pre<Query<CompletedCourseDoc, CompletedCourseDoc>>(
+  /^findOneAnd/,
+  async function () {
+    (this as any).r = await this.clone().findOne();
+  },
+);
 
-completedcourseSchema.post<Query<CompletedCourseDoc, CompletedCourseDoc>>(/^findOneAnd/, async function () {
-  if ((this as any).r) {
-    await ((this as any).r.constructor as CompletedCourseModel).totalNumberOfStudents((this as any).r.courseId);
-  }
-});
+completedcourseSchema.post<Query<CompletedCourseDoc, CompletedCourseDoc>>(
+  /^findOneAnd/,
+  async function () {
+    if ((this as any).r) {
+      await (
+        (this as any).r.constructor as CompletedCourseModel
+      ).totalNumberOfStudents((this as any).r.courseId);
+    }
+  },
+);
 
 /**
- * 11. Create and export model
+ * Model — first generic is the raw schema type, not the hydrated document
  */
-export const CompletedCourse = model<CompletedCourseDoc, CompletedCourseModel>(
+export const CompletedCourse = model<CompletedCourseType, CompletedCourseModel>(
   'CompletedCourse',
   completedcourseSchema,
 );
 
-// Export types for use in other files
 export type { CompletedCourseDoc, CompletedCourseModel, CompletedCourseType };
-
-export default CompletedCourse;

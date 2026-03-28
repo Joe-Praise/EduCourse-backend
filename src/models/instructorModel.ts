@@ -8,9 +8,6 @@ import {
   Query
 } from "mongoose";
 
-/**
- * 1. Define schema (single source of truth)
- */
 const instructorSchema = new Schema(
   {
     userId: {
@@ -27,37 +24,38 @@ const instructorSchema = new Schema(
       required: [true, 'Instructor should have a description'],
       default: 'I am an instructor, i have my course coming soon',
     },
-    links: [{ 
-      type: Schema.Types.ObjectId, 
-      ref: 'Link' 
+    links: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Link',
     }],
     expertise: {
       type: String,
       required: [true, 'Instructor expertise is required!'],
     },
-    active: { 
-      type: Boolean, 
-      default: true, 
-      select: false 
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
+    active: {
+      type: Boolean,
+      default: true,
+      select: false,
     },
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type InstructorType = InferSchemaType<typeof instructorSchema> & { _id: Types.ObjectId }
+type InstructorType = InferSchemaType<typeof instructorSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface InstructorMethods {
   getFullProfile(this: InstructorDoc): Promise<InstructorDoc>;
@@ -66,21 +64,18 @@ interface InstructorMethods {
 }
 
 /**
- * 4. Define statics (optional)
+ * Statics
  */
 interface InstructorStatics {
   findByUser(this: InstructorModel, userId: string): Promise<InstructorDoc | null>;
   findByExpertise(this: InstructorModel, expertise: string): Promise<InstructorDoc[]>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type InstructorDoc = HydratedDocument<InstructorType, InstructorMethods>;
 type InstructorModel = Model<InstructorType, {}, InstructorMethods> & InstructorStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 instructorSchema.methods.getFullProfile = async function (this: InstructorDoc) {
   return await this.populate(['userId', 'links']);
@@ -100,7 +95,7 @@ instructorSchema.methods.removeLink = async function (this: InstructorDoc, linkI
 };
 
 /**
- * 7. Add statics
+ * Statics
  */
 instructorSchema.statics.findByUser = function (userId: string) {
   return this.findOne({ userId });
@@ -111,13 +106,13 @@ instructorSchema.statics.findByExpertise = function (expertise: string) {
 };
 
 /**
- * 8. Add indexes
+ * Indexes
  */
 instructorSchema.index({ userId: 1 }, { unique: true });
 instructorSchema.index({ expertise: 1 });
 
 /**
- * 9. Add virtuals
+ * Virtuals
  */
 instructorSchema.virtual('courses', {
   ref: 'Course',
@@ -126,26 +121,15 @@ instructorSchema.virtual('courses', {
 });
 
 /**
- * 10. Middleware (typed this)
+ * Middleware
  */
 instructorSchema.pre<Query<InstructorDoc[], InstructorDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
-  this.populate({
-    path: 'userId',
-    select: '-__v -passwordChangedAt -password',
-  });
-
-  this.populate({
-    path: 'links',
-    select: '-__v -userId',
-  });
-
+  this.populate({ path: 'userId', select: '-__v -passwordChangedAt -password' });
+  this.populate({ path: 'links', select: '-__v -userId' });
   next();
 });
 
-/**
- * 11. Export model
- */
 const Instructor = model<InstructorType, InstructorModel>("Instructor", instructorSchema);
 
 export { Instructor, InstructorType, InstructorDoc, InstructorModel };

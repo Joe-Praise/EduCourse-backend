@@ -29,7 +29,7 @@ class APIFeatures {
         // checks if arr element is part of the queryObj
         if (queryObj[el]) {
           const value = queryObj[el];
-          const newValue = value.indexOf(',') !== -1 ? value.split(',') : value;
+          const newValue = value.indexOf(',') !== -1 ? value.split(',') : [value];
           queryObj[el] = { $in: newValue };
         }
       });

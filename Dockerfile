@@ -54,10 +54,12 @@ ENV NODE_ENV=production
 # Copy only needed files from builder
 COPY --from=builder /usr/src/app/package*.json ./
 COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/config.env ./config.env
 
 # Install only production deps
 RUN npm install --omit=dev
+
+# Switch to non-root user for security
+USER node
 
 # Expose your app port
 EXPOSE 3050
