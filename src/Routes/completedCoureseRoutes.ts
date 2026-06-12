@@ -6,6 +6,7 @@ import {
   deleteCompletedCourse,
   getAllActiveCourse,
   updateActiveCourseLessons,
+  getProgressSummary,
 } from '../Controllers/completedCourseController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
@@ -19,5 +20,6 @@ router
   .patch(updateActiveCourseLessons)
   .delete(deleteCompletedCourse);
 router.route('/active/course').get(getAllActiveCourse);
+router.route('/progress/:userId/:courseId').get(getProgressSummary);
 
 export default router;

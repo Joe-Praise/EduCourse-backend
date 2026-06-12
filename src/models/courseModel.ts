@@ -5,9 +5,9 @@ import {
   Model,
   InferSchemaType,
   Types,
-  Query
-} from "mongoose";
-import slugify from "slugify";
+  Query,
+} from 'mongoose';
+import slugify from 'slugify';
 
 const courseSchema = new Schema(
   {
@@ -27,24 +27,25 @@ const courseSchema = new Schema(
       type: String,
       enum: {
         values: ['Beginner', 'Intermediate', 'Advanced', 'All Levels'],
-        message: 'Level must be one of: Beginner, Intermediate, Advanced, All Levels',
+        message:
+          'Level must be one of: Beginner, Intermediate, Advanced, All Levels',
       },
     },
     instructors: [
       {
         type: Schema.Types.ObjectId,
         ref: 'Instructor',
-        required: [true, 'instructor name is required!'],
       },
     ],
+    aiInstructor: {
+      type: String,
+    },
     category: {
       type: Schema.Types.ObjectId,
       ref: 'Category',
-      required: [true, 'A course must have a category!'],
     },
     duration: {
       type: String,
-      required: [true, 'A course must have a duration'],
     },
     totalLessons: {
       type: Number,
@@ -62,7 +63,7 @@ const courseSchema = new Schema(
     },
     price: {
       type: Number,
-      required: [true, 'A course must have a price'],
+      default: 0,
     },
     priceDiscount: {
       type: Number,
@@ -70,7 +71,8 @@ const courseSchema = new Schema(
         validator: function (this: any, val: number) {
           return val <= this.price;
         },
-        message: 'Discount price ({VALUE}) should be below or equal to the regular price',
+        message:
+          'Discount price ({VALUE}) should be below or equal to the regular price',
       },
     },
     priceCategory: {
@@ -85,6 +87,60 @@ const courseSchema = new Schema(
     studentsQuantity: {
       type: Number,
       default: 0,
+    },
+    publishedStatus: {
+      type: String,
+      enum: {
+        values: ['importing', 'draft', 'review', 'published', 'archived', 'failed'],
+        message:
+          'Published status must be one of: importing, draft, review, published, archived, failed',
+      },
+      default: 'draft',
+    },
+    publishedAt: {
+      type: Date,
+    },
+    submittedForReviewAt: {
+      type: Date,
+    },
+    totalRevenue: {
+      type: Number,
+      default: 0,
+    },
+    aiScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    aiFeedback: {
+      type: String,
+    },
+    aiReviewedAt: {
+      type: Date,
+    },
+    youtubePlaylistId: {
+      type: String,
+    },
+    channelId: {
+      type: String,
+    },
+    videoCount: {
+      type: Number,
+    },
+    qualityScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    aiSummary: {
+      difficulty: { type: String },
+      prerequisites: { type: String },
+      willBuild: { type: String },
+      summary: [{ type: String }],
+    },
+    aiTags: [{ type: String }],
+    importQuery: {
+      type: String,
     },
     active: {
       type: Boolean,
@@ -121,7 +177,15 @@ interface CourseMethods {
  */
 interface CourseStatics {
   findByCategory(this: CourseModel, categoryId: string): Promise<CourseDoc[]>;
-  findByInstructor(this: CourseModel, instructorId: string): Promise<CourseDoc[]>;
+  findByInstructor(
+    this: CourseModel,
+    instructorId: string,
+  ): Promise<CourseDoc[]>;
+  findByStatus(this: CourseModel, status: string): Promise<CourseDoc[]>;
+  findAllByInstructor(
+    this: CourseModel,
+    instructorId: string,
+  ): Promise<CourseDoc[]>;
 }
 
 type CourseDoc = HydratedDocument<CourseType, CourseMethods>;
@@ -149,6 +213,17 @@ courseSchema.statics.findByInstructor = function (instructorId: string) {
   return this.find({ instructors: instructorId });
 };
 
+courseSchema.statics.findByStatus = function (status: string) {
+  return this.find({ publishedStatus: status });
+};
+
+// Bypasses the pre-find publishedStatus filter — used by instructor dashboard
+courseSchema.statics.findAllByInstructor = function (instructorId: string) {
+  return this.find({ instructors: instructorId }).setOptions({
+    skipPublishedFilter: true,
+  });
+};
+
 /**
  * Indexes
  */
@@ -167,6 +242,10 @@ courseSchema.virtual('reviews', {
  * Middleware
  */
 courseSchema.pre<Query<CourseDoc[], CourseDoc>>(/^find/, function (next) {
+  const opts = this.getOptions() as any;
+  if (!opts.skipPublishedFilter) {
+    this.find({ publishedStatus: 'published' });
+  }
   this.find({ active: { $ne: false } });
   this.populate({ path: 'instructors', select: '-__v' });
   this.populate({ path: 'category', select: '-__v' });
@@ -178,6 +257,6 @@ courseSchema.pre<CourseDoc>('save', function (next) {
   next();
 });
 
-const Course = model<CourseType, CourseModel>("Course", courseSchema);
+const Course = model<CourseType, CourseModel>('Course', courseSchema);
 
 export { Course, CourseType, CourseDoc, CourseModel };

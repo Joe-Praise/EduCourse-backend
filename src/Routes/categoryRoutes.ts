@@ -11,8 +11,10 @@ import { protect, restrictTo } from '../middlewares/authMiddleware.js';
 import {
   getRegisteredCourse,
 } from '../Controllers/completedCourseController.js';
+import { strictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
 
 const router = express.Router();
+router.use(strictXssSanitizer);
 router.route('/').get(getAllCategory).post(protect, createCategory);
 
 router.use(protect);

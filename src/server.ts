@@ -1,12 +1,20 @@
 import dotenv from 'dotenv';
+// Load env BEFORE Sentry init so SENTRY_DSN is available.
+dotenv.config({ path: './config.env' });
+
+import { logger } from './utils/logger.js';
+import { initSentry, captureException } from './utils/sentry.js';
 import mongoose from 'mongoose';
 
+// Initialise Sentry as early as possible — must precede `app.js` import so
+// any module-init errors get captured.
+initSentry();
+
 process.on('uncaughtException', (err: Error) => {
-  console.log('UNCAUGHT EXCEPTION! ❌ Shutting down...');
-  console.log(err.name, err.message);
+  captureException(err, { source: 'uncaughtException' });
+  logger.error('UNCAUGHT EXCEPTION! Shutting down...', err.name, err.message);
 });
 
-dotenv.config({ path: './config.env' });
 import app from './app.js';
 
 const DB = process.env.DATABASE?.replace(
@@ -17,17 +25,17 @@ const DB = process.env.DATABASE?.replace(
 mongoose.connect(DB);
 
 mongoose.connection.on('open', () => {
-  console.log('Mongodb Connected');
+  logger.info('Mongodb connected');
 });
 
 const port = process.env.NODE_ENV === 'production' ? process.env.PORT : 3050;
 
 app.listen(port, () => {
-  console.log(`App running on port ${port}...`);
+  logger.info(`App running on port ${port}...`);
 });
 
 // handling all unhandled rejection
 process.on('unhandledRejection', (err: Error) => {
-  console.log('UNHANDLED REJECTION! ❌ Shutting down...');
-  console.log(err.name, err.message);
+  captureException(err, { source: 'unhandledRejection' });
+  logger.error('UNHANDLED REJECTION! Shutting down...', err.name, err.message);
 });

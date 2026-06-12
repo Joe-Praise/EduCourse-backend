@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, requirePermission, restrictTo } from '../middlewares/authMiddleware.js';
+import { strictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
 import {
   getAllLessons,
   createLesson,
@@ -9,6 +10,7 @@ import {
 } from '../Controllers/lessonController.js';
 
 const router = express.Router();
+router.use(strictXssSanitizer);
 
 router.use(protect);
 

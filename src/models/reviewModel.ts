@@ -31,6 +31,17 @@ const reviewSchema = new Schema(
       max: 5,
       required: [true, 'A review must have a rating'],
     },
+    sentiment: {
+      type: String,
+      enum: ['positive', 'negative', 'neutral'],
+    },
+    flagged: {
+      type: Boolean,
+      default: false,
+    },
+    moderationNote: {
+      type: String,
+    },
     active: {
       type: Boolean,
       default: true,

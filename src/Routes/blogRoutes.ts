@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, requirePermission, restrictTo } from '../middlewares/authMiddleware.js';
+import { sanitizeRichText } from '../middlewares/richTextSanitizer.js';
 import {
   getAllBlog,
   createBlog,
@@ -19,7 +20,7 @@ router.route('/autocomplete').get(atlasAutocomplete);
 router
   .route('/')
   .get(getAllBlog)
-  .post(protect, restrictTo(['instructor', 'admin']), createBlog);
+  .post(protect, restrictTo(['instructor', 'admin']), sanitizeRichText(['description']), createBlog);
 
 router.use(protect);
 router
@@ -33,7 +34,7 @@ router
 router
   .route('/:id')
   .get(getBlog)
-  .patch(restrictTo(['instructor', 'admin']), updateBlog)
+  .patch(restrictTo(['instructor', 'admin']), sanitizeRichText(['description']), updateBlog)
   .delete(restrictTo(['instructor', 'admin']), deleteBlog);
 
 export default router;

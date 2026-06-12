@@ -1,4 +1,5 @@
 import express from 'express';
+import { sanitizeRichText } from '../middlewares/richTextSanitizer.js';
 import {
   createInstructor,
   getAllInstructors,
@@ -20,9 +21,9 @@ const router = express.Router();
 router
   .route('/')
   .get(getAllInstructors)
-  .post(protect, restrictTo(['admin', 'instructor']), createInstructor);
+  .post(protect, restrictTo(['admin', 'instructor']), sanitizeRichText(['description']), createInstructor);
 
-router.patch('/updateMe', protect, restrictTo(['admin', 'instructor']), updateMe);
+router.patch('/updateMe', protect, restrictTo(['admin', 'instructor']), sanitizeRichText(['description']), updateMe);
 router.delete(
   '/deleteMe',
   protect,
@@ -45,7 +46,7 @@ router.get(
 router
   .route('/:id')
   .get(getOneInstructor)
-  .patch(protect, restrictTo(['admin', 'instructor']), updateInstructor)
+  .patch(protect, restrictTo(['admin', 'instructor']), sanitizeRichText(['description']), updateInstructor)
   .delete(protect, restrictTo(['admin', 'instructor']), deleteInstructor);
 
 export default router;

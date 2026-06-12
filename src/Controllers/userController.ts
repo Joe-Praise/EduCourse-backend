@@ -1,6 +1,7 @@
+import { logger } from '../utils/logger.js';
 import multer from 'multer';
-import sharp from 'sharp';
 import { User } from '../models/userModel.js';
+import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
 import { Instructor } from '../models/instructorModel.js';
 import AppError from '../utils/appError.js';
 import { CompletedCourse } from '../models/completedcourseModel.js';
@@ -44,17 +45,15 @@ const upload = multer({ storage: multerStorage, fileFilter: multerFilter });
 export const uploadUserPhoto = upload.single('photo');
 
 export const resizePhoto = catchAsync(
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     if (!req.file) return next();
 
-    req.file.filename = `user-${req.user!._id}-${Date.now()}.jpeg`;
+    const result = await uploadBufferToCloudinary({
+      buffer: req.file.buffer,
+      publicId: `building-safety/users/${req.user!._id}`,
+    });
 
-    await sharp(req.file.buffer)
-      .resize(500, 500)
-      .toFormat('jpeg')
-      .jpeg({ quality: 90 })
-      .toFile(`public/img/${req.file.filename}`);
-
+    req.file.filename = result.secure_url;
     next();
   },
 );
@@ -138,7 +137,7 @@ export const getProfile = catchAsync(
       }
 
       const features = new APIFeatures(
-        Course.find({ instructors: { $in: instructor._id } }),
+        Course.find({ instructors: instructor._id }),
         {} as any,
       ).filter();
 
@@ -183,7 +182,7 @@ export const getProfile = catchAsync(
     } else {
       return next(new AppError('User not found!', 404));
     }
-    // console.log(userDetails.courses);
+    // logger.debug(userDetails.courses);
 
     if (userDetails.courses) {
       userDetails.courses = convertDate(userDetails.courses);

@@ -3,6 +3,7 @@ import {
   createCertificate,
   getAllCertificates,
   getCertificate,
+  getMyCertificates,
   updateCertificate,
   deleteCertificate,
 } from "../Controllers/certificateController.js";
@@ -16,6 +17,8 @@ router
   .post(protect, restrictTo(["admin", "instructor"]), createCertificate);
 
 router.use(protect);
+// Auth'd user's own certificates with course populated — must precede /:id
+router.get("/me", getMyCertificates);
 router
   .route("/:id")
   .get(getCertificate)

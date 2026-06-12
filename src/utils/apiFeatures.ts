@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import type { Query } from 'mongoose';
 
 interface QueryString {
@@ -39,7 +40,7 @@ class APIFeatures {
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
 
     this.query = this.query.find(JSON.parse(queryStr));
-    // console.log('API Feature', this.queryStr);
+    // logger.debug('API Feature', this.queryStr);
     return this;
   }
 

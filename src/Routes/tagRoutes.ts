@@ -7,8 +7,10 @@ import {
   deleteTag,
 } from '../Controllers/tagController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
+import { strictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
 
 const router = express.Router();
+router.use(strictXssSanitizer);
 
 router.route('/').get(getAllTags).post(protect, restrictTo(['admin']), createTag);
 

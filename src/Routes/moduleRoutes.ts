@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, requirePermission } from '../middlewares/authMiddleware.js';
+import { strictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
 import {
   getAllModules,
   createModule,
@@ -11,6 +12,7 @@ import {
 } from '../Controllers/moduleController.js';
 
 const router = express.Router();
+router.use(strictXssSanitizer);
 
 router.route('/').get(getAllModules);
 router.use(protect);

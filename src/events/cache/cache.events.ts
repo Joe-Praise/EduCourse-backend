@@ -67,4 +67,22 @@ export const CacheEvent = {
     UPDATED: "cache:link:updated",
     DELETED: "cache:link:deleted",
   },
+  ENROLLMENT: {
+    CREATED: "cache:enrollment:created",
+    UPDATED: "cache:enrollment:updated",
+    DELETED: "cache:enrollment:deleted",
+  },
+  WISHLIST: {
+    CREATED: "cache:wishlist:created",
+    DELETED: "cache:wishlist:deleted",
+  },
+  NOTIFICATION: {
+    CREATED: "cache:notification:created",
+    UPDATED: "cache:notification:updated",
+    DELETED: "cache:notification:deleted",
+  },
+  INSTRUCTOR_EARNING: {
+    CREATED: "cache:instructorearning:created",
+    UPDATED: "cache:instructorearning:updated",
+  },
 } as const;

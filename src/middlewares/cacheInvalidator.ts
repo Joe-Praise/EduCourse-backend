@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 // middleware/cacheInvalidator.ts
 import type { Request, Response, NextFunction } from "express";
 import redis from "../config/redis.js"; // your shared Redis client
@@ -27,7 +28,7 @@ export const cacheInvalidator =
               // If the pattern has no wildcard, treat as exact key
               if (!pattern.includes("*")) {
                 await redis.del(pattern);
-                // console.log(`🧹 Cache cleared: ${pattern}`);
+                // logger.debug(`🧹 Cache cleared: ${pattern}`);
                 continue;
               }
 
@@ -50,10 +51,10 @@ export const cacheInvalidator =
                 }
               } while (cursor !== "0");
 
-              // console.log(`🧹 Cleared ${totalDeleted} cache entries for pattern: ${pattern}`);
+              // logger.debug(`🧹 Cleared ${totalDeleted} cache entries for pattern: ${pattern}`);
             }
           } catch (error) {
-            console.error("❌ Cache invalidation error:", error);
+            logger.error("❌ Cache invalidation error:", error);
           }
         }
       })();

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 import type { Request, Response, NextFunction } from 'express';
 import catchAsync from '../utils/catchAsync.js';
 import  AppError from '../utils/appError.js';
@@ -31,7 +32,7 @@ export const createModule = catchAsync(async (req: Request, res: Response, next:
   req.body.moduleIndex = index;
   req.body.section = `Section ${index}`;
 
-  // console.log(req.body);
+  // logger.debug(req.body);
   // create the CourseModule if all cases are passed
   const newModule = await CourseModule.create({
     courseId: req.body.courseId,
@@ -88,13 +89,13 @@ export const getAllModules = catchAsync(async (req: Request, res: Response, next
 //   // let modules = [];
 //   const { courseId } = req.query;
 
-//   console.log(req.user._id);
+//   logger.debug(req.user._id);
 //   const isActivated = await CompletedCourse.find({
 //     courseId,
 //     userId: req.user._id,
 //   });
 
-//   console.log(isActivated);
+//   logger.debug(isActivated);
 //   // if (isActivated) {
 //   //   modules = await CourseModule.find({ courseId });
 //   // } else {

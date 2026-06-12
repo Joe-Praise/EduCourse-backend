@@ -7,6 +7,7 @@ import {
   Types
 } from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import validator from "validator";
 import { roles } from "../utils/constants.js";
 
@@ -47,6 +48,8 @@ const userSchema = new Schema(
       },
     },
     passwordChangedAt: Date,
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
     // Explicitly defined so select:false applies to Mongoose-managed timestamps
     createdAt: { type: Date, select: false },
     updatedAt: { type: Date, select: false },
@@ -75,6 +78,7 @@ interface UserMethods {
     userPassword: string
   ): Promise<boolean>;
   changedPasswordAfter(this: UserDoc, JWTTimestamp: number): boolean;
+  createPasswordResetToken(this: UserDoc): string;
 }
 
 /**
@@ -103,6 +107,16 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp: number) {
     return JWTTimestamp < changedTimestamp;
   }
   return false;
+};
+
+userSchema.methods.createPasswordResetToken = function (this: UserDoc): string {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
+  this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
+  return rawToken;
 };
 
 /**

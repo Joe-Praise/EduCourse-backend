@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 import type { Request, Response, NextFunction } from 'express';
 import catchAsync  from '../utils/catchAsync.js';
 import AppError  from '../utils/appError.js';
@@ -9,6 +10,7 @@ import { appEvents } from '../events/index.js';
 
 // Import CommonJS modules
 import { CompletedCourse } from "../models/completedcourseModel.js";
+import { Lesson } from "../models/lessonModel.js";
 import  filterObj  from "../utils/filterObj.js";
 
 // Import cache events to register listeners
@@ -79,7 +81,7 @@ export const getAllCompletedCourse = catchAsync(async (req: Request, res: Respon
 export const getAllActiveCourse = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   (req.query as any).completed = false;
 
-  // console.log(req.query);
+  // logger.debug(req.query);
   const features = new APIFeatures(CompletedCourse.find(), req.query)
     .filter()
     .sorting()
@@ -97,7 +99,7 @@ export const getAllActiveCourse = catchAsync(async (req: Request, res: Response,
 export const updateActiveCourseLessons = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   const exists = await CompletedCourse.findById(id);
-  // console.log(exists);
+  // logger.debug(exists);
 
   if (!exists) {
     return next(new AppError('Document does not exist', 400));
@@ -127,6 +129,28 @@ export const updateActiveCourseLessons = catchAsync(async (req: Request, res: Re
   res.status(200).json({
     status: 'success',
     data: exists,
+  });
+});
+
+export const getProgressSummary = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  const { userId, courseId } = req.params;
+
+  const record = await CompletedCourse.findOne({ userId, courseId }).setOptions({ skipPopulate: true });
+
+  if (!record) {
+    return res.status(200).json({
+      status: 'success',
+      data: { lessonsCompleted: 0, totalLessons: 0, completionPercentage: 0, completed: false },
+    });
+  }
+
+  const totalLessons = await Lesson.countDocuments({ courseId });
+  const lessonsCompleted = record.lessonsCompleted.length;
+  const completionPercentage = totalLessons > 0 ? Math.round((lessonsCompleted / totalLessons) * 100) : 0;
+
+  res.status(200).json({
+    status: 'success',
+    data: { lessonsCompleted, totalLessons, completionPercentage, completed: record.completed },
   });
 });
 

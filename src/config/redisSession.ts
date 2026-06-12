@@ -18,6 +18,7 @@ export const sessionMiddleware = session({
   cookie: {
     secure: process.env.NODE_ENV === "production", // secure only in prod
     httpOnly: true,
-    maxAge: 1000 * 60 * 60, // 1 hour
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days — aligned with JWT lifetime
   },
 });
