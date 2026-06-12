@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/USER/Desktop/Tech/My projects/EduCourse)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
