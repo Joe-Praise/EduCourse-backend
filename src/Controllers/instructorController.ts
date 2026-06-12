@@ -1,0 +1,240 @@
+import type { Request, Response, NextFunction } from 'express';
+import  catchAsync from '../utils/catchAsync.js';
+import  AppError from '../utils/appError.js';
+import { getAll, updateOne, deleteOne, getOne } from './handlerFactory.js';
+import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
+import { cacheManager } from '../utils/cacheManager.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+import { appEvents } from '../events/index.js';
+import APIFeatures from '../utils/apiFeatures.js';
+import Pagination from '../utils/paginationFeatures.js';
+
+// Import CommonJS modules
+import { Instructor } from "../models/instructorModel.js";
+import { Course } from "../models/courseModel.js";
+import { User } from "../models/userModel.js";
+import filterObj from "../utils/filterObj.js";
+
+// Import cache events to register listeners
+import '../events/cache/instructorCache.events.js';
+
+// Interface for authenticated requests
+interface AuthenticatedRequest extends Request {
+  user?: {
+    _id: string;
+    role: string[];
+  };
+}
+
+interface InstructorData {
+  _id: string;
+  [key: string]: any;
+}
+
+function getUniqueInstructorId(instructors: InstructorData[]): string[] {
+  if (!instructors.length) return [];
+  const cache: Record<string, boolean> = {};
+
+  for (let i = 0; i < instructors.length; i += 1) {
+    if (!cache[instructors[i]._id]) {
+      cache[instructors[i]._id] = true;
+    }
+  }
+
+  return Object.keys(cache);
+}
+
+export const createInstructor = catchAsync(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const admin = ['admin'];
+  const isAdmin = admin.some((el) => req.user!.role.indexOf(el) !== -1);
+
+  const { userId, links } = req.body;
+
+  const query = isAdmin === true ? { userId } : { userId: req.user!._id };
+
+  // if admin use userId from body else use logged in userId
+  const instructorCheck = await Instructor.find(query);
+
+  // checj for existing instructor
+  if (instructorCheck.length) {
+    return next(new AppError('Document already exists', 404));
+  }
+
+  // get user from user collection
+  const user = await User.findById({ _id: userId });
+
+  if (!user) {
+    next(new AppError('User does not exist!', 404));
+  }
+
+  const userCopy = user ? user.toObject() : undefined;
+  if (userCopy) {
+    userCopy.role.push('instructor');
+    user?.overwrite({ ...userCopy });
+    await user?.save({ validateBeforeSave: false });
+  }
+
+  const instructor = await Instructor.create({
+    userId,
+    links,
+  });
+
+  // Emit cache event for instructor creation
+  appEvents.emit(CacheEvent.INSTRUCTOR.CREATED, instructor);
+
+  return res.status(201).json({
+    status: 'success',
+    data: instructor,
+  });
+});
+
+export const updateMe = catchAsync(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const filteredBody = filterObj(req.body, 'links', 'title', 'description', 'expertise');
+  const instructor = await Instructor.findOne({
+    userId: req.user!._id,
+  });
+
+  if (!instructor) {
+    return next(new AppError('Instructor does not exist!', 404));
+  }
+
+  const data = (instructor as any)._doc;
+
+  instructor.overwrite({ ...data, ...filteredBody });
+  await instructor.save();
+  res.status(200).json({
+    status: 'success',
+    data: {
+      instructor: instructor,
+    },
+  });
+});
+
+export const deleteMe = catchAsync(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const instructor = await Instructor.findOne({
+    userId: req.user!._id,
+  });
+
+  if (!instructor) {
+    return next(new AppError('Instructor does not exist!', 404));
+  }
+
+  await Instructor.findByIdAndUpdate(instructor._id, { active: false });
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+});
+
+/**
+ * List instructors — but ONLY those who appear on at least one PUBLISHED
+ * course. Avoids showing empty/draft instructors (and YouTube instructors whose
+ * import failed) on the public instructors page. Mirrors the factory `getAll`
+ * shape (APIFeatures + Pagination + metaData envelope).
+ */
+export const getAllInstructors = catchAsync(
+  async (req: Request, res: Response, _next: NextFunction): Promise<Response | void> => {
+    // Distinct instructor ids referenced by any published course.
+    const instructorIds = await Course.distinct('instructors', {
+      publishedStatus: 'published',
+    });
+
+    const features = new APIFeatures(
+      Instructor.find({ _id: { $in: instructorIds } }),
+      req.query,
+    )
+      .filter()
+      .sorting()
+      .limitFields();
+
+    const documents = await features.query;
+    const { metaData, data } = new Pagination(req.query).paginate(documents);
+
+    return res.status(200).json({ status: 'success', metaData, data });
+  },
+);
+
+export const getOneInstructor = getOne(Instructor);
+
+// Interface for requests with registered courses
+interface RegisteredCoursesRequest extends Request {
+  registeredCourses?: Array<{
+    courseId: {
+      instructors: InstructorData[];
+    };
+  }>;
+}
+
+export const getMyLearningInstructors = catchAsync(async (req: RegisteredCoursesRequest, res: Response, next: NextFunction) => {
+  const { registeredCourses } = req;
+  const userId = req.params.userId;
+
+  // Generate cache key for user's learning instructors
+  const cacheKey = CacheKeyBuilder.resourceKey("user-instructors", userId);
+  
+  // Try to get cached data first
+  const cachedResult = await cacheManager.get(cacheKey);
+  
+  if (cachedResult) {
+    return res.status(200).json({
+      status: 'success',
+      data: cachedResult,
+    });
+  }
+
+  // used middleware in completedCourse controller to get this data
+  if (!registeredCourses) {
+    const emptyResult: any[] = [];
+    
+    // Cache empty result for short time to avoid repeated DB calls
+    await cacheManager.set(cacheKey, emptyResult, 60); // 1 minute TTL for empty results
+    
+    return res.status(200).json({
+      status: 'success',
+      data: emptyResult,
+    });
+  }
+
+  // Get instructors id from courses user is registered for
+  const getInstructorsId = registeredCourses
+    .map((course: any) => course.courseId.instructors)
+    .flatMap((el: any) => el);
+
+  // Get unique id's from arr of id's
+  const uniqueInstructors = getUniqueInstructorId(getInstructorsId);
+
+  // find instructors with those id's
+  const data = await Instructor.find({ _id: { $in: uniqueInstructors } });
+
+  // Cache the result
+  await cacheManager.set(cacheKey, data, 300); // 5 minutes TTL
+
+  res.status(200).json({
+    status: 'success',
+    data: data,
+  });
+});
+
+export const updateInstructor = updateOne(Instructor, { 
+  cachePattern: CacheEvent.INSTRUCTOR.UPDATED 
+});
+
+export const deleteInstructor = deleteOne(Instructor, { 
+  cachePattern: CacheEvent.INSTRUCTOR.DELETED 
+});
+
+// id is the particular instructor id not userId
+export const suspendInstructor = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  const instructor = await Instructor.findById(id);
+
+  if (!instructor) {
+    return next(new AppError('Instructor does not exist!', 404));
+  }
+
+  await Instructor.findByIdAndUpdate(instructor._id, { active: false });
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+});
