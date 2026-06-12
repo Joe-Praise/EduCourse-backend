@@ -28,7 +28,10 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
+config.env
+*.env
 **/build
 **/dist
 LICENSE
 README.md
+config.env

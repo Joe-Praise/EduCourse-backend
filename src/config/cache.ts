@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger.js';
 import redis from "./redis.js";
 
 const DEFAULT_TTL = 60 * 60; // 1 hour in seconds
@@ -9,7 +10,7 @@ export const cache = {
 
   async get<T>(key: string): Promise<T | null> {
     const data = await redis.get(key);
-    console.log('coming from cache: ', data);
+    logger.debug('coming from cache: ', data);
     return data ? (JSON.parse(data) as T) : null;
   },
 

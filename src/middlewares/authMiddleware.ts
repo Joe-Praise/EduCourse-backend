@@ -1,8 +1,9 @@
+import { logger } from '../utils/logger.js';
 import jwt from 'jsonwebtoken';
 import { NextFunction, Response, Request } from 'express';
 import  catchAsync from '../utils/catchAsync.js';
 import  AppError from '../utils/appError.js';
-import { JwtPayload } from '../utils/helper.js';
+import { AuthenticatedRequest, JwtPayload } from '../utils/helper.js';
 import { User } from '../models/userModel.js';
 import { PERMISSION_MATRIX, RoleType } from '../utils/constants.js';
 import redis from '../config/redis.js';
@@ -10,6 +11,12 @@ import redis from '../config/redis.js';
 export const protect = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   //Session-based authentication (browser)
   if(req.session?.user){
+    const sessionUser = await User.findById(req.session.user.id);
+    if (!sessionUser) {
+      req.session.destroy(() => {});
+      return next(new AppError('Session user no longer exists. Please log in again.', 401));
+    }
+    (req as AuthenticatedRequest).user = sessionUser;
     return next();
   };
 
@@ -48,13 +55,13 @@ export const protect = catchAsync(async (req: Request, res: Response, next: Next
     }
 
     // 5) Grant access to protected route
-    // req.session?.user = currentUser;
       req.session.user = {
         id: currentUser.id,
         role: currentUser.role,
         username: currentUser.name
       };
-      
+      (req as AuthenticatedRequest).user = currentUser;
+
     next();
   } catch (error) {
     return next(new AppError('Invalid token. Please log in again.', 401));
@@ -104,13 +111,13 @@ const hasResourcePermission = (
 
   // Check if resource exists in permission matrix
   if (!PERMISSION_MATRIX[resource]) {
-    console.warn(`Resource '${resource}' not found in permission matrix`);
+    logger.warn(`Resource '${resource}' not found in permission matrix`);
     return false;
   }
 
   // Check if action exists for this resource
   if (!PERMISSION_MATRIX[resource][action]) {
-    console.warn(`Action '${action}' not allowed on resource '${resource}'`);
+    logger.warn(`Action '${action}' not allowed on resource '${resource}'`);
     return false;
   }
 
@@ -192,16 +199,16 @@ const getFromCache = async (key: string): Promise<boolean | string | null> => {
     const result = await redis.get(key);
     return result ? JSON.parse(result) : null;
   } catch (error) {
-    console.warn('⚠️ Redis cache read error:', error);
+    logger.warn('⚠️ Redis cache read error:', error);
     return null;
   }
 };
 
 const setInCache = async (key: string, value: boolean): Promise<void> => {
   try {
-    await redis.setex(key, CACHE_TTL, JSON.stringify(value));
+    await redis.set(key, JSON.stringify(value), { EX: CACHE_TTL });
   } catch (error) {
-    console.warn('⚠️ Redis cache write error:', error);
+    logger.warn('⚠️ Redis cache write error:', error);
   }
 };
 
@@ -209,7 +216,7 @@ const deleteFromCache = async (key: string): Promise<void> => {
   try {
     await redis.del(key);
   } catch (error) {
-    console.warn('⚠️ Redis cache delete error:', error);
+    logger.warn('⚠️ Redis cache delete error:', error);
   }
 };
 
@@ -258,12 +265,12 @@ export const restrictTo = (
       isPermitted = hasResourcePermission(userRoles, options.resource, options.action, options);
       
       // Log detailed permission check for enterprise auditing
-      console.log(`Permission Check: User ${userId} with roles [${userRoles.join(',')}] attempting '${options.action}' on '${options.resource}' -> ${isPermitted ? 'ALLOWED' : 'DENIED'}`);
+      logger.debug(`Permission Check: User ${userId} with roles [${userRoles.join(',')}] attempting '${options.action}' on '${options.resource}' -> ${isPermitted ? 'ALLOWED' : 'DENIED'}`);
     } else {
       // Fallback to legacy role-only checking
       isPermitted = hasPermission(userRoles, roles, options);
       
-      console.log(`Legacy Permission Check: User ${userId} with roles [${userRoles.join(',')}] checking roles [${roles.join(',')}] -> ${isPermitted ? 'ALLOWED' : 'DENIED'}`);
+      logger.debug(`Legacy Permission Check: User ${userId} with roles [${userRoles.join(',')}] checking roles [${roles.join(',')}] -> ${isPermitted ? 'ALLOWED' : 'DENIED'}`);
     }
     
     // Cache result in Redis for performance (with TTL)
@@ -271,7 +278,7 @@ export const restrictTo = (
 
     if (!isPermitted) {
       // Log unauthorized access attempt (enterprise security)
-      console.warn(`Unauthorized access attempt: User ${userId} with roles [${userRoles.join(',')}] tried to access resource requiring [${roles.join(',')}]`);
+      logger.warn(`Unauthorized access attempt: User ${userId} with roles [${userRoles.join(',')}] tried to access resource requiring [${roles.join(',')}]`);
       
       return next(
         new AppError('You do not have permission to perform this action!', 403),
@@ -323,7 +330,7 @@ export const requirePermission = (
 
     if (!isPermitted) {
       // Enterprise security logging
-      console.warn(`🚫 UNAUTHORIZED ACCESS: User ${userId} with roles [${userRoles.join(',')}] attempted '${action}' on '${resource}' - BLOCKED`);
+      logger.warn(`🚫 UNAUTHORIZED ACCESS: User ${userId} with roles [${userRoles.join(',')}] attempted '${action}' on '${resource}' - BLOCKED`);
       
       return next(
         new AppError(`Access denied: You cannot '${action}' on '${resource}'. Required roles: [${PERMISSION_MATRIX[resource]?.[action]?.join(', ') || 'undefined'}]`, 403),
@@ -331,7 +338,7 @@ export const requirePermission = (
     }
     
     // Success logging
-    console.log(`✅ AUTHORIZED ACCESS: User ${userId} performing '${action}' on '${resource}'`);
+    logger.debug(`✅ AUTHORIZED ACCESS: User ${userId} performing '${action}' on '${resource}'`);
     next();
   };
 };
@@ -371,10 +378,10 @@ export const clearUserPermissionCache = async (userId: string): Promise<void> =>
     
     if (keys.length > 0) {
       await redis.del(keys);
-      console.log(`🗑️ Cleared ${keys.length} permission cache entries for user ${userId}`);
+      logger.debug(`🗑️ Cleared ${keys.length} permission cache entries for user ${userId}`);
     }
   } catch (error) {
-    console.warn('⚠️ Failed to clear user permission cache:', error);
+    logger.warn('⚠️ Failed to clear user permission cache:', error);
   }
 };
 
@@ -388,10 +395,10 @@ export const clearAllPermissionCache = async (): Promise<void> => {
     
     if (keys.length > 0) {
       await redis.del(keys);
-      console.log(`🗑️ Cleared all ${keys.length} permission cache entries`);
+      logger.debug(`🗑️ Cleared all ${keys.length} permission cache entries`);
     }
   } catch (error) {
-    console.warn('⚠️ Failed to clear all permission cache:', error);
+    logger.warn('⚠️ Failed to clear all permission cache:', error);
   }
 };
 
@@ -422,7 +429,7 @@ export const getPermissionCacheStats = async (): Promise<{
       keysByUser
     };
   } catch (error) {
-    console.warn('⚠️ Failed to get permission cache stats:', error);
+    logger.warn('⚠️ Failed to get permission cache stats:', error);
     return { totalKeys: 0, keysByUser: {} };
   }
 };

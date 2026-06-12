@@ -8,15 +8,34 @@ import {
   Query
 } from "mongoose";
 
-/**
- * 1. Define schema (single source of truth)
- */
 const instructorSchema = new Schema(
   {
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Instructor must be a user'],
+    },
+    channelId: {
+      type: String,
+    },
+    channelName: {
+      type: String,
+    },
+    // YouTube channel profile fields — populated for `source: 'youtube'`
+    // instructors (which have no linked User). The frontend reads these
+    // directly so user-less instructors still render an avatar/bio/link.
+    channelThumbnailUrl: {
+      type: String,
+    },
+    channelUrl: {
+      type: String,
+    },
+    subscriberCount: {
+      type: Number,
+    },
+    source: {
+      type: String,
+      enum: ['user', 'youtube'],
+      default: 'user',
     },
     title: {
       type: String,
@@ -27,37 +46,54 @@ const instructorSchema = new Schema(
       required: [true, 'Instructor should have a description'],
       default: 'I am an instructor, i have my course coming soon',
     },
-    links: [{ 
-      type: Schema.Types.ObjectId, 
-      ref: 'Link' 
+    links: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Link',
     }],
     expertise: {
       type: String,
       required: [true, 'Instructor expertise is required!'],
     },
-    active: { 
-      type: Boolean, 
-      default: true, 
-      select: false 
+    totalStudents: {
+      type: Number,
+      default: 0,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
+    totalRevenue: {
+      type: Number,
+      default: 0,
+    },
+    totalCourses: {
+      type: Number,
+      default: 0,
+    },
+    rating: {
+      type: Number,
+      default: 0,
+    },
+    active: {
+      type: Boolean,
+      default: true,
+      select: false,
     },
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type InstructorType = InferSchemaType<typeof instructorSchema> & { _id: Types.ObjectId }
+type InstructorType = InferSchemaType<typeof instructorSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface InstructorMethods {
   getFullProfile(this: InstructorDoc): Promise<InstructorDoc>;
@@ -66,21 +102,18 @@ interface InstructorMethods {
 }
 
 /**
- * 4. Define statics (optional)
+ * Statics
  */
 interface InstructorStatics {
   findByUser(this: InstructorModel, userId: string): Promise<InstructorDoc | null>;
   findByExpertise(this: InstructorModel, expertise: string): Promise<InstructorDoc[]>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type InstructorDoc = HydratedDocument<InstructorType, InstructorMethods>;
 type InstructorModel = Model<InstructorType, {}, InstructorMethods> & InstructorStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 instructorSchema.methods.getFullProfile = async function (this: InstructorDoc) {
   return await this.populate(['userId', 'links']);
@@ -100,7 +133,7 @@ instructorSchema.methods.removeLink = async function (this: InstructorDoc, linkI
 };
 
 /**
- * 7. Add statics
+ * Statics
  */
 instructorSchema.statics.findByUser = function (userId: string) {
   return this.findOne({ userId });
@@ -111,13 +144,29 @@ instructorSchema.statics.findByExpertise = function (expertise: string) {
 };
 
 /**
- * 8. Add indexes
+ * Indexes
+ *
+ * userId / channelId use PARTIAL unique indexes (not `sparse`). A sparse index
+ * still indexes documents whose field is explicitly `null` — and a plain
+ * unique index treats a *missing* field as null too, so only ONE doc could
+ * lack the field. That broke YouTube-imported instructors (no `userId`) and
+ * user-created instructors (no `channelId`): the first claimed the null slot,
+ * every subsequent one hit E11000. A partialFilterExpression scoped by `$type`
+ * means uniqueness is enforced ONLY for real values; user-less / channel-less
+ * docs are excluded from the index entirely.
  */
-instructorSchema.index({ userId: 1 }, { unique: true });
+instructorSchema.index(
+  { userId: 1 },
+  { unique: true, partialFilterExpression: { userId: { $type: 'objectId' } } },
+);
+instructorSchema.index(
+  { channelId: 1 },
+  { unique: true, partialFilterExpression: { channelId: { $type: 'string' } } },
+);
 instructorSchema.index({ expertise: 1 });
 
 /**
- * 9. Add virtuals
+ * Virtuals
  */
 instructorSchema.virtual('courses', {
   ref: 'Course',
@@ -126,26 +175,15 @@ instructorSchema.virtual('courses', {
 });
 
 /**
- * 10. Middleware (typed this)
+ * Middleware
  */
 instructorSchema.pre<Query<InstructorDoc[], InstructorDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
-  this.populate({
-    path: 'userId',
-    select: '-__v -passwordChangedAt -password',
-  });
-
-  this.populate({
-    path: 'links',
-    select: '-__v -userId',
-  });
-
+  this.populate({ path: 'userId', select: '-__v -passwordChangedAt -password' });
+  this.populate({ path: 'links', select: '-__v -userId' });
   next();
 });
 
-/**
- * 11. Export model
- */
 const Instructor = model<InstructorType, InstructorModel>("Instructor", instructorSchema);
 
 export { Instructor, InstructorType, InstructorDoc, InstructorModel };

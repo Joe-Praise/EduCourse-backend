@@ -7,13 +7,8 @@ import {
   Types,
   Query
 } from "mongoose";
-
-// Import Course model for rating calculations
 import { Course } from './courseModel.js';
 
-/**
- * 1. Define schema (single source of truth)
- */
 const reviewSchema = new Schema(
   {
     userId: {
@@ -36,9 +31,16 @@ const reviewSchema = new Schema(
       max: 5,
       required: [true, 'A review must have a rating'],
     },
-    createdAt: { 
-      type: Date, 
-      default: Date.now 
+    sentiment: {
+      type: String,
+      enum: ['positive', 'negative', 'neutral'],
+    },
+    flagged: {
+      type: Boolean,
+      default: false,
+    },
+    moderationNote: {
+      type: String,
     },
     active: {
       type: Boolean,
@@ -47,18 +49,23 @@ const reviewSchema = new Schema(
     },
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type ReviewType = InferSchemaType<typeof reviewSchema> & { _id: Types.ObjectId }
+type ReviewType = InferSchemaType<typeof reviewSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface ReviewMethods {
   isPositive(this: ReviewDoc): boolean;
@@ -66,7 +73,7 @@ interface ReviewMethods {
 }
 
 /**
- * 4. Define statics
+ * Statics
  */
 interface ReviewStatics {
   calcAverageRatings(this: ReviewModel, courseId: string): Promise<void>;
@@ -74,14 +81,11 @@ interface ReviewStatics {
   findByUser(this: ReviewModel, userId: string): Promise<ReviewDoc[]>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type ReviewDoc = HydratedDocument<ReviewType, ReviewMethods>;
 type ReviewModel = Model<ReviewType, {}, ReviewMethods> & ReviewStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 reviewSchema.methods.isPositive = function (this: ReviewDoc) {
   return this.rating >= 4;
@@ -92,13 +96,11 @@ reviewSchema.methods.getFormattedRating = function (this: ReviewDoc) {
 };
 
 /**
- * 7. Add statics
+ * Statics
  */
 reviewSchema.statics.calcAverageRatings = async function (courseId: string) {
   const stats = await this.aggregate([
-    {
-      $match: { courseId: new Types.ObjectId(courseId) },
-    },
+    { $match: { courseId: new Types.ObjectId(courseId) } },
     {
       $group: {
         _id: '$courseId',
@@ -130,30 +132,25 @@ reviewSchema.statics.findByUser = function (userId: string) {
 };
 
 /**
- * 8. Add indexes
+ * Indexes
  */
 reviewSchema.index({ courseId: 1, userId: 1 }, { unique: true });
 reviewSchema.index({ courseId: 1 });
 reviewSchema.index({ rating: 1 });
 
 /**
- * 9. Middleware (typed this)
+ * Middleware
  */
 reviewSchema.pre<Query<ReviewDoc[], ReviewDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
-  this.populate({
-    path: 'userId',
-    select: '-__v -password',
-  });
+  this.populate({ path: 'userId', select: '-__v -password' });
   next();
 });
 
-// Calculate average ratings when review is saved
 reviewSchema.post<ReviewDoc>('save', function () {
   (this.constructor as ReviewModel).calcAverageRatings(this.courseId.toString());
 });
 
-// Handle findOneAndUpdate/findOneAndDelete operations
 reviewSchema.pre(/^findOneAnd/, async function (next) {
   (this as any).r = await (this as any).model.findOne((this as any).getQuery());
   next();
@@ -161,13 +158,12 @@ reviewSchema.pre(/^findOneAnd/, async function (next) {
 
 reviewSchema.post(/^findOneAnd/, async function () {
   if ((this as any).r) {
-    await ((this as any).r.constructor as ReviewModel).calcAverageRatings((this as any).r.courseId.toString());
+    await ((this as any).r.constructor as ReviewModel).calcAverageRatings(
+      (this as any).r.courseId.toString(),
+    );
   }
 });
 
-/**
- * 10. Export model
- */
 const Review = model<ReviewType, ReviewModel>("Review", reviewSchema);
 
 export { Review, ReviewType, ReviewDoc, ReviewModel };

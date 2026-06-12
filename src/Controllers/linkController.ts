@@ -2,9 +2,14 @@ import type { Request, Response, NextFunction } from 'express';
 import  catchAsync from '../utils/catchAsync.js';
 import  AppError  from '../utils/appError.js';
 import { getOne, updateOne, deleteOne } from './handlerFactory.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+import { appEvents } from '../events/index.js';
 
 // Import CommonJS modules
 import { Link } from "../models/linkModel.js";
+
+// Import cache events to register listeners
+import '../events/cache/linkCache.events.js';
 
 export const createLink = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   // query for all links linked to the user/instructor
@@ -23,6 +28,8 @@ export const createLink = catchAsync(async (req: Request, res: Response, next: N
     platform: req.body.platform,
     url: req.body.url,
   });
+
+  appEvents.emit(CacheEvent.LINK.CREATED, link);
 
   res.status(201).json({
     status: 'success',
@@ -49,6 +56,6 @@ export const getAllLinks = catchAsync(async (req: Request, res: Response, next: 
 
 export const getLink = getOne(Link);
 
-export const updateLink = updateOne(Link);
+export const updateLink = updateOne(Link, { cachePattern: CacheEvent.LINK.UPDATED });
 
-export const deleteLink = deleteOne(Link);
+export const deleteLink = deleteOne(Link, { cachePattern: CacheEvent.LINK.DELETED });

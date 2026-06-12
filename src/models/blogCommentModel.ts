@@ -7,13 +7,8 @@ import {
   Types,
   Query
 } from "mongoose";
-
-// Import Blog model for comment quantity calculations
 import { Blog } from './blogModel.js';
 
-/**
- * 1. Define schema (single source of truth)
- */
 const blogCommentSchema = new Schema(
   {
     userId: {
@@ -31,10 +26,6 @@ const blogCommentSchema = new Schema(
       required: [true, 'A blog comment must have content!'],
       trim: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
     active: {
       type: Boolean,
       default: true,
@@ -42,18 +33,23 @@ const blogCommentSchema = new Schema(
     },
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type BlogCommentType = InferSchemaType<typeof blogCommentSchema> & { _id: Types.ObjectId }
+type BlogCommentType = InferSchemaType<typeof blogCommentSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface BlogCommentMethods {
   getExcerpt(this: BlogCommentDoc, length?: number): string;
@@ -61,7 +57,7 @@ interface BlogCommentMethods {
 }
 
 /**
- * 4. Define statics
+ * Statics
  */
 interface BlogCommentStatics {
   totalNumberOfComments(this: BlogCommentModel, blogId: string): Promise<void>;
@@ -69,17 +65,14 @@ interface BlogCommentStatics {
   findByUser(this: BlogCommentModel, userId: string): Promise<BlogCommentDoc[]>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type BlogCommentDoc = HydratedDocument<BlogCommentType, BlogCommentMethods>;
 type BlogCommentModel = Model<BlogCommentType, {}, BlogCommentMethods> & BlogCommentStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 blogCommentSchema.methods.getExcerpt = function (this: BlogCommentDoc, length: number = 100) {
-  return this.review.length > length 
+  return this.review.length > length
     ? this.review.substring(0, length) + '...'
     : this.review;
 };
@@ -89,23 +82,16 @@ blogCommentSchema.methods.isFromUser = function (this: BlogCommentDoc, userId: s
 };
 
 /**
- * 7. Add statics
+ * Statics
  */
 blogCommentSchema.statics.totalNumberOfComments = async function (blogId: string) {
   const stats = await this.aggregate([
-    {
-      $match: { blogId: new Types.ObjectId(blogId), active: { $ne: false } },
-    },
-    {
-      $count: 'commentsQuantity',
-    },
+    { $match: { blogId: new Types.ObjectId(blogId), active: { $ne: false } } },
+    { $count: 'commentsQuantity' },
   ]);
 
   const commentCount = stats.length ? stats[0].commentsQuantity : 0;
-  
-  await Blog.findByIdAndUpdate(blogId, {
-    commentsQuantity: commentCount,
-  });
+  await Blog.findByIdAndUpdate(blogId, { commentsQuantity: commentCount });
 };
 
 blogCommentSchema.statics.findByBlog = function (blogId: string) {
@@ -117,35 +103,26 @@ blogCommentSchema.statics.findByUser = function (userId: string) {
 };
 
 /**
- * 8. Add indexes
+ * Indexes
+ * Note: no unique constraint on blogId+userId — users may comment multiple times
  */
 blogCommentSchema.index({ blogId: 1, createdAt: -1 });
 blogCommentSchema.index({ userId: 1 });
-blogCommentSchema.index({ blogId: 1, userId: 1 }, { unique: true });
 
 /**
- * 9. Middleware (typed this)
+ * Middleware
  */
 blogCommentSchema.pre<Query<BlogCommentDoc[], BlogCommentDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
-
-  this.populate({
-    path: 'userId',
-    select: '-__v',
-  });
-  this.populate({
-    path: 'blogId',
-    select: 'commentsQuantity _id title',
-  });
+  this.populate({ path: 'userId', select: '-__v' });
+  this.populate({ path: 'blogId', select: 'commentsQuantity _id title' });
   next();
 });
 
-// Calculate total comments when document is saved
 blogCommentSchema.post<BlogCommentDoc>('save', function () {
   (this.constructor as BlogCommentModel).totalNumberOfComments(this.blogId.toString());
 });
 
-// Handle findOneAndUpdate/findOneAndDelete operations
 blogCommentSchema.pre(/^findOneAnd/, async function (next) {
   (this as any).r = await (this as any).model.findOne((this as any).getQuery());
   next();
@@ -153,13 +130,12 @@ blogCommentSchema.pre(/^findOneAnd/, async function (next) {
 
 blogCommentSchema.post(/^findOneAnd/, async function () {
   if ((this as any).r) {
-    await ((this as any).r.constructor as BlogCommentModel).totalNumberOfComments((this as any).r.blogId.toString());
+    await ((this as any).r.constructor as BlogCommentModel).totalNumberOfComments(
+      (this as any).r.blogId.toString(),
+    );
   }
 });
 
-/**
- * 10. Export model
- */
 const BlogComment = model<BlogCommentType, BlogCommentModel>("BlogComment", blogCommentSchema);
 
 export { BlogComment, BlogCommentType, BlogCommentDoc, BlogCommentModel };

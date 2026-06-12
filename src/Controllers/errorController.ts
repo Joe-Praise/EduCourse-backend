@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger.js';
+import { captureException } from '../utils/sentry.js';
 import type { Request, Response, NextFunction } from 'express';
 import AppError from '../utils/appError.js';
 
@@ -20,7 +22,7 @@ const handleCastErrorDB = (err: MongoError): InstanceType<typeof AppError> => {
 const handleDuplicateFieldsDB = (err: MongoError): InstanceType<typeof AppError> => {
   // const value = err.keyValue.name;
   const value = err.message.match(/(["'])(\\?.)*?\1/)?.[0] || 'unknown';
-  // console.log(value);
+  // logger.debug(value);
   const message = `Duplicate field value: ${value}. Please use another value!`;
   return new AppError(message, 400);
 };
@@ -61,7 +63,7 @@ const sendErrorProd = (err: MongoError, res: Response): void => {
     // Programming or other unknown error: don't leak error details
   } else {
     // 1) Log error
-    console.error('ERROR 💥', err);
+    logger.error('ERROR 💥', err);
 
     // 2) send generic message
     res.status(500).json({
@@ -71,9 +73,19 @@ const sendErrorProd = (err: MongoError, res: Response): void => {
   }
 };
 
-export default (err: MongoError, req: Request, res: Response, next: NextFunction): void => {
+export default (err: MongoError, req: Request, res: Response, _next: NextFunction): void => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
+
+  // Surface non-operational errors (real bugs) to Sentry. Operational errors
+  // (validation, 4xx) are expected user-input issues — those just respond.
+  if (!err.isOperational || (err.statusCode && err.statusCode >= 500)) {
+    captureException(err, {
+      url: req.originalUrl,
+      method: req.method,
+      statusCode: err.statusCode,
+    });
+  }
 
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);

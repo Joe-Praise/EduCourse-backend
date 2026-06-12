@@ -4,13 +4,11 @@ import {
   HydratedDocument,
   Model,
   InferSchemaType,
-  Query
-} from "mongoose";
-import slugify from "slugify";
+  Types,
+  Query,
+} from 'mongoose';
+import slugify from 'slugify';
 
-/**
- * 1. Define schema (single source of truth)
- */
 const courseSchema = new Schema(
   {
     title: {
@@ -28,25 +26,26 @@ const courseSchema = new Schema(
     level: {
       type: String,
       enum: {
-        values: ['All Levels'],
-        message: 'Skill is either: All levels',
+        values: ['Beginner', 'Intermediate', 'Advanced', 'All Levels'],
+        message:
+          'Level must be one of: Beginner, Intermediate, Advanced, All Levels',
       },
     },
     instructors: [
       {
         type: Schema.Types.ObjectId,
         ref: 'Instructor',
-        required: [true, 'instructor name is required!'],
       },
     ],
+    aiInstructor: {
+      type: String,
+    },
     category: {
       type: Schema.Types.ObjectId,
       ref: 'Category',
-      required: [true, 'A course must have a category!'],
     },
     duration: {
       type: String,
-      required: [true, 'A course must have a duration'],
     },
     totalLessons: {
       type: Number,
@@ -58,27 +57,22 @@ const courseSchema = new Schema(
       max: [5, 'Rating must be below 5.0'],
       set: (val: number) => Math.round(val * 10) / 10,
     },
-    ratingSummary: [
-      {
-        type: Number,
-      },
-    ],
-    ratingsQuantity: { 
-      type: Number, 
-      default: 0 
+    ratingsQuantity: {
+      type: Number,
+      default: 0,
     },
-    price: { 
-      type: Number, 
-      required: [true, 'A course must have a price'] 
+    price: {
+      type: Number,
+      default: 0,
     },
     priceDiscount: {
       type: Number,
       validate: {
-        validator: function (this: CourseType, val: number) {
+        validator: function (this: any, val: number) {
           return val <= this.price;
         },
         message:
-          'Discount price({VALUE}) should be below or equal to the regular price',
+          'Discount price ({VALUE}) should be below or equal to the regular price',
       },
     },
     priceCategory: {
@@ -90,35 +84,88 @@ const courseSchema = new Schema(
       },
       default: 'Free',
     },
-    studentsQuantity: { 
-      type: Number, 
-      default: 0 
+    studentsQuantity: {
+      type: Number,
+      default: 0,
+    },
+    publishedStatus: {
+      type: String,
+      enum: {
+        values: ['importing', 'draft', 'review', 'published', 'archived', 'failed'],
+        message:
+          'Published status must be one of: importing, draft, review, published, archived, failed',
+      },
+      default: 'draft',
+    },
+    publishedAt: {
+      type: Date,
+    },
+    submittedForReviewAt: {
+      type: Date,
+    },
+    totalRevenue: {
+      type: Number,
+      default: 0,
+    },
+    aiScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    aiFeedback: {
+      type: String,
+    },
+    aiReviewedAt: {
+      type: Date,
+    },
+    youtubePlaylistId: {
+      type: String,
+    },
+    channelId: {
+      type: String,
+    },
+    videoCount: {
+      type: Number,
+    },
+    qualityScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    aiSummary: {
+      difficulty: { type: String },
+      prerequisites: { type: String },
+      willBuild: { type: String },
+      summary: [{ type: String }],
+    },
+    aiTags: [{ type: String }],
+    importQuery: {
+      type: String,
     },
     active: {
       type: Boolean,
       default: true,
       select: false,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type CourseType = InferSchemaType<typeof courseSchema> & { _id: Schema.Types.ObjectId }
-type CourseDoc = HydratedDocument<CourseType, CourseMethods>;
-type CourseModel = Model<CourseType, {}, CourseMethods> & CourseStatics;
+type CourseType = InferSchemaType<typeof courseSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods — defined before CourseDoc/CourseModel types that reference them
  */
 interface CourseMethods {
   getDiscountedPrice(this: CourseDoc): number;
@@ -126,16 +173,26 @@ interface CourseMethods {
 }
 
 /**
- * 4. Define statics (optional)
+ * Statics
  */
 interface CourseStatics {
   findByCategory(this: CourseModel, categoryId: string): Promise<CourseDoc[]>;
-  findByInstructor(this: CourseModel, instructorId: string): Promise<CourseDoc[]>;
+  findByInstructor(
+    this: CourseModel,
+    instructorId: string,
+  ): Promise<CourseDoc[]>;
+  findByStatus(this: CourseModel, status: string): Promise<CourseDoc[]>;
+  findAllByInstructor(
+    this: CourseModel,
+    instructorId: string,
+  ): Promise<CourseDoc[]>;
 }
 
+type CourseDoc = HydratedDocument<CourseType, CourseMethods>;
+type CourseModel = Model<CourseType, {}, CourseMethods> & CourseStatics;
 
 /**
- * 5. Add methods
+ * Methods
  */
 courseSchema.methods.getDiscountedPrice = function (this: CourseDoc) {
   return this.priceDiscount ? this.priceDiscount : this.price;
@@ -146,7 +203,7 @@ courseSchema.methods.hasDiscount = function (this: CourseDoc) {
 };
 
 /**
- * 6. Add statics
+ * Statics
  */
 courseSchema.statics.findByCategory = function (categoryId: string) {
   return this.find({ category: categoryId });
@@ -156,13 +213,24 @@ courseSchema.statics.findByInstructor = function (instructorId: string) {
   return this.find({ instructors: instructorId });
 };
 
+courseSchema.statics.findByStatus = function (status: string) {
+  return this.find({ publishedStatus: status });
+};
+
+// Bypasses the pre-find publishedStatus filter — used by instructor dashboard
+courseSchema.statics.findAllByInstructor = function (instructorId: string) {
+  return this.find({ instructors: instructorId }).setOptions({
+    skipPublishedFilter: true,
+  });
+};
+
 /**
- * 7. Add indexes
+ * Indexes
  */
 courseSchema.index({ title: 'text' });
 
 /**
- * 8. Add virtuals
+ * Virtuals
  */
 courseSchema.virtual('reviews', {
   ref: 'Review',
@@ -171,21 +239,16 @@ courseSchema.virtual('reviews', {
 });
 
 /**
- * 9. Middleware (typed this)
+ * Middleware
  */
 courseSchema.pre<Query<CourseDoc[], CourseDoc>>(/^find/, function (next) {
+  const opts = this.getOptions() as any;
+  if (!opts.skipPublishedFilter) {
+    this.find({ publishedStatus: 'published' });
+  }
   this.find({ active: { $ne: false } });
-
-  this.populate({
-    path: 'instructors',
-    select: '-__v',
-  });
-
-  this.populate({
-    path: 'category',
-    select: '-__v',
-  });
-
+  this.populate({ path: 'instructors', select: '-__v' });
+  this.populate({ path: 'category', select: '-__v' });
   next();
 });
 
@@ -194,9 +257,6 @@ courseSchema.pre<CourseDoc>('save', function (next) {
   next();
 });
 
-/**
- * 10. Export model
- */
-const Course = model<CourseType, CourseModel>("Course", courseSchema);
+const Course = model<CourseType, CourseModel>('Course', courseSchema);
 
 export { Course, CourseType, CourseDoc, CourseModel };

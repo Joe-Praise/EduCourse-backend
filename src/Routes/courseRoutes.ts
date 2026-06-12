@@ -12,8 +12,13 @@ import {
   // atlasSearchCourse,
   atlasAutocomplete,
   getMyLearningCourse,
+  submitForReview,
+  publishCourse,
+  archiveCourse,
 } from '../Controllers/courseController.js';
+import { triggerQuizGeneration, getQuiz } from '../Controllers/aiTriggerController.js';
 import { protect, requirePermission } from '../middlewares/authMiddleware.js';
+import { sanitizeRichText } from '../middlewares/richTextSanitizer.js';
 import reviewRouter from './reviewRoutes.js';
 import upload from '../utils/handleImageUpload.js';
 
@@ -23,11 +28,7 @@ router.use('/:courseId/reviews', reviewRouter);
 router
   .route('/')
   .get(getAllCourses)
-  .post(
-    protect, 
-    requirePermission('courses', 'create'),
-    createCourse
-  );
+  .post(protect, requirePermission('courses', 'create'), sanitizeRichText(['description']), createCourse);
 
 // router.route('/search').get(atlasSearchCourse);
 router.route('/autocomplete').get(atlasAutocomplete);
@@ -46,7 +47,14 @@ router
 router
   .route('/:id')
   .get(getCourse)
-  .patch(requirePermission('courses', 'update'), updateCourse)
+  .patch(requirePermission('courses', 'update'), sanitizeRichText(['description']), updateCourse)
   .delete(requirePermission('courses', 'delete'), deleteCourse);
+
+router.patch('/:id/submit-review', requirePermission('courses', 'publish'), submitForReview);
+router.patch('/:id/publish', requirePermission('courses', 'publish'), publishCourse);
+router.patch('/:id/archive', requirePermission('courses', 'archive'), archiveCourse);
+
+router.post('/:id/modules/:moduleIndex/generate-quiz', requirePermission('courses', 'update'), triggerQuizGeneration);
+router.get('/:id/modules/:moduleIndex/quiz', getQuiz);
 
 export default router;

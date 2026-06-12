@@ -33,7 +33,41 @@ export const PERMISSION_MATRIX: Record<string, Record<string, RoleType[]>> = {
   'reviews': {
     'read': ['user', 'instructor', 'admin'],
     'create': ['user', 'instructor', 'admin'],
-    'update': ['admin'], // Only admins can edit reviews
+    'update': ['admin'],
     'delete': ['admin']
-  }
+  },
+  'enrollments': {
+    'read': ['user', 'instructor', 'admin'],
+    'create': ['user', 'instructor', 'admin'],
+    'delete': ['admin'],
+  },
+  'wishlist': {
+    'read': ['user', 'instructor', 'admin'],
+    'create': ['user', 'instructor', 'admin'],
+    'delete': ['user', 'instructor', 'admin'],
+  },
+  'notifications': {
+    'read': ['user', 'instructor', 'admin'],
+    'update': ['user', 'instructor', 'admin'],
+    'delete': ['user', 'instructor', 'admin'],
+  },
+  'earnings': {
+    'read': ['instructor', 'admin'],
+  },
+  'analytics': {
+    'read': ['instructor', 'admin'],
+  },
+  'ai': {
+    'generate': ['user', 'instructor', 'admin'],
+    'moderate': ['admin'],
+  },
+  'platform': {
+    'read': ['user', 'instructor', 'admin'],
+  },
+  'streak': {
+    'read': ['user', 'instructor', 'admin'],
+  },
+  'badges': {
+    'read': ['user', 'instructor', 'admin'],
+  },
 } as const;

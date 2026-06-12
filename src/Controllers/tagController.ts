@@ -5,16 +5,18 @@ import {
   updateOne,
   deleteOne,
 } from './handlerFactory.js';
-
-// Import CommonJS modules
 import { Tag } from "../models/tagModel.js";
+import { CacheEvent } from '../events/cache/cache.events.js';
 
-export const createTag = createOne(Tag);
+// Import cache events to register listeners
+import '../events/cache/tagCache.events.js';
+
+export const createTag = createOne(Tag, { cachePattern: CacheEvent.TAG.CREATED });
 
 export const getAllTags = getAll(Tag);
 
-export const getTag = getOne(Tag);
+export const getTag = getOne(Tag, { modelName: 'tag' });
 
-export const updateTag = updateOne(Tag);
+export const updateTag = updateOne(Tag, { cachePattern: CacheEvent.TAG.UPDATED });
 
-export const deleteTag = deleteOne(Tag);
+export const deleteTag = deleteOne(Tag, { cachePattern: CacheEvent.TAG.DELETED });

@@ -6,9 +6,12 @@ import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { cacheManager } from '../utils/cacheManager.js';
 import { CacheEvent } from '../events/cache/cache.events.js';
 import { appEvents } from '../events/index.js';
+import APIFeatures from '../utils/apiFeatures.js';
+import Pagination from '../utils/paginationFeatures.js';
 
 // Import CommonJS modules
 import { Instructor } from "../models/instructorModel.js";
+import { Course } from "../models/courseModel.js";
 import { User } from "../models/userModel.js";
 import filterObj from "../utils/filterObj.js";
 
@@ -86,7 +89,7 @@ export const createInstructor = catchAsync(async (req: AuthenticatedRequest, res
 });
 
 export const updateMe = catchAsync(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  const filteredBody = filterObj(req.body, 'links');
+  const filteredBody = filterObj(req.body, 'links', 'title', 'description', 'expertise');
   const instructor = await Instructor.findOne({
     userId: req.user!._id,
   });
@@ -123,7 +126,33 @@ export const deleteMe = catchAsync(async (req: AuthenticatedRequest, res: Respon
   });
 });
 
-export const getAllInstructors = getAll(Instructor);
+/**
+ * List instructors — but ONLY those who appear on at least one PUBLISHED
+ * course. Avoids showing empty/draft instructors (and YouTube instructors whose
+ * import failed) on the public instructors page. Mirrors the factory `getAll`
+ * shape (APIFeatures + Pagination + metaData envelope).
+ */
+export const getAllInstructors = catchAsync(
+  async (req: Request, res: Response, _next: NextFunction): Promise<Response | void> => {
+    // Distinct instructor ids referenced by any published course.
+    const instructorIds = await Course.distinct('instructors', {
+      publishedStatus: 'published',
+    });
+
+    const features = new APIFeatures(
+      Instructor.find({ _id: { $in: instructorIds } }),
+      req.query,
+    )
+      .filter()
+      .sorting()
+      .limitFields();
+
+    const documents = await features.query;
+    const { metaData, data } = new Pagination(req.query).paginate(documents);
+
+    return res.status(200).json({ status: 'success', metaData, data });
+  },
+);
 
 export const getOneInstructor = getOne(Instructor);
 

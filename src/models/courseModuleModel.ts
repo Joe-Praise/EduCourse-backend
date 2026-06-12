@@ -1,4 +1,12 @@
-import {Schema, model, HydratedDocument, Model, InferSchemaType, Query} from 'mongoose';
+import {
+  Schema,
+  model,
+  HydratedDocument,
+  Model,
+  InferSchemaType,
+  Types,
+  Query,
+} from 'mongoose';
 
 const courseModuleSchema = new Schema(
   {
@@ -19,10 +27,6 @@ const courseModuleSchema = new Schema(
       type: String,
       required: [true, 'A course module must have a section'],
     },
-    createdAt: {
-      type: Date,
-      default: Date.now(),
-    },
     active: {
       type: Boolean,
       default: true,
@@ -30,16 +34,21 @@ const courseModuleSchema = new Schema(
     },
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
-courseModuleSchema.index({ courseId: 1 });
-
-type CourseModuleType = InferSchemaType<typeof courseModuleSchema> & { _id: Schema.Types.ObjectId };
+type CourseModuleType = InferSchemaType<typeof courseModuleSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 type CourseModuleDoc = HydratedDocument<CourseModuleType>;
 type CourseModuleModel = Model<CourseModuleType, {}, {}>;
+
+courseModuleSchema.index({ courseId: 1 });
 
 courseModuleSchema.virtual('lessons', {
   ref: 'Lesson',
@@ -47,21 +56,12 @@ courseModuleSchema.virtual('lessons', {
   localField: '_id',
 });
 
-// courseSchema.virtual('reviews', {
-//   ref: 'Review',
-//   foreignField: 'courseId',
-//   localField: '_id',
-// });
-
 courseModuleSchema.pre<Query<CourseModuleDoc[], CourseModuleDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
-
-  this.populate({
-    path: 'lessons',
-    select: '-__v',
-  });
+  this.populate({ path: 'lessons', select: '-__v' });
   next();
 });
 
 const CourseModule = model<CourseModuleType, CourseModuleModel>('Module', courseModuleSchema);
-export {CourseModule, CourseModuleType, CourseModuleDoc, CourseModuleModel};
+
+export { CourseModule, CourseModuleType, CourseModuleDoc, CourseModuleModel };

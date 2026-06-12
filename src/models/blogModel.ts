@@ -9,9 +9,6 @@ import {
 } from "mongoose";
 import slugify from "slugify";
 
-/**
- * 1. Define schema (single source of truth)
- */
 const blogSchema = new Schema(
   {
     category: {
@@ -45,10 +42,6 @@ const blogSchema = new Schema(
       type: Number,
       default: 0,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
     active: {
       type: Boolean,
       default: true,
@@ -56,27 +49,31 @@ const blogSchema = new Schema(
     },
   },
   {
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type BlogType = InferSchemaType<typeof blogSchema> & { _id: Types.ObjectId }
+type BlogType = InferSchemaType<typeof blogSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface BlogMethods {
   generateExcerpt(this: BlogDoc, length?: number): string;
   isPublished(this: BlogDoc): boolean;
-  incrementComments(this: BlogDoc): Promise<BlogDoc>;
 }
 
 /**
- * 4. Define statics (optional)
+ * Statics
  */
 interface BlogStatics {
   findByCategory(this: BlogModel, categoryId: string): Promise<BlogDoc[]>;
@@ -84,17 +81,14 @@ interface BlogStatics {
   findPublished(this: BlogModel): Promise<BlogDoc[]>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type BlogDoc = HydratedDocument<BlogType, BlogMethods>;
 type BlogModel = Model<BlogType, {}, BlogMethods> & BlogStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 blogSchema.methods.generateExcerpt = function (this: BlogDoc, length: number = 150) {
-  return this.description.length > length 
+  return this.description.length > length
     ? this.description.substring(0, length) + '...'
     : this.description;
 };
@@ -103,13 +97,8 @@ blogSchema.methods.isPublished = function (this: BlogDoc) {
   return this.active !== false;
 };
 
-blogSchema.methods.incrementComments = async function (this: BlogDoc) {
-  this.commentsQuantity = (this.commentsQuantity || 0) + 1;
-  return await this.save();
-};
-
 /**
- * 7. Add statics
+ * Statics
  */
 blogSchema.statics.findByCategory = function (categoryId: string) {
   return this.find({ category: categoryId });
@@ -124,14 +113,14 @@ blogSchema.statics.findPublished = function () {
 };
 
 /**
- * 8. Add indexes
+ * Indexes
  */
 blogSchema.index({ title: 'text', description: 'text' });
 blogSchema.index({ category: 1 });
 blogSchema.index({ tag: 1 });
 
 /**
- * 9. Add virtuals
+ * Virtuals
  */
 blogSchema.virtual('comments', {
   ref: 'BlogComment',
@@ -140,20 +129,12 @@ blogSchema.virtual('comments', {
 });
 
 /**
- * 10. Middleware (typed this)
+ * Middleware
  */
 blogSchema.pre<Query<BlogDoc[], BlogDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
-
-  this.populate({
-    path: 'category',
-    select: '-__v',
-  });
-
-  this.populate({
-    path: 'tag',
-    select: '-__v',
-  });
+  this.populate({ path: 'category', select: '-__v' });
+  this.populate({ path: 'tag', select: '-__v' });
   next();
 });
 
@@ -162,9 +143,6 @@ blogSchema.pre<BlogDoc>('save', function (next) {
   next();
 });
 
-/**
- * 11. Export model
- */
 const Blog = model<BlogType, BlogModel>("Blog", blogSchema);
 
 export { Blog, BlogType, BlogDoc, BlogModel };

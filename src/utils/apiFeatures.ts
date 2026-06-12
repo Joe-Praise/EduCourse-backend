@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import type { Query } from 'mongoose';
 
 interface QueryString {
@@ -29,7 +30,7 @@ class APIFeatures {
         // checks if arr element is part of the queryObj
         if (queryObj[el]) {
           const value = queryObj[el];
-          const newValue = value.indexOf(',') !== -1 ? value.split(',') : value;
+          const newValue = value.indexOf(',') !== -1 ? value.split(',') : [value];
           queryObj[el] = { $in: newValue };
         }
       });
@@ -39,7 +40,7 @@ class APIFeatures {
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
 
     this.query = this.query.find(JSON.parse(queryStr));
-    // console.log('API Feature', this.queryStr);
+    // logger.debug('API Feature', this.queryStr);
     return this;
   }
 

@@ -8,62 +8,59 @@ import {
   Query
 } from "mongoose";
 
-/**
- * 1. Define schema (single source of truth)
- */
-const tagSchema = new Schema({
-  name: {
-    type: String,
-    required: [true, 'A tag must have name!'],
-    unique: true,
-    trim: true,
+const tagSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: [true, 'A tag must have name!'],
+      unique: true,
+      trim: true,
+    },
+    active: {
+      type: Boolean,
+      default: true,
+      select: false,
+    },
   },
-  active: {
-    type: Boolean,
-    default: true,
-    select: false,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { timestamps: true },
+);
 
 /**
- * 2. Infer base type from schema (no duplication!)
+ * Infer base type from schema (no duplication!)
  */
-type TagType = InferSchemaType<typeof tagSchema> & { _id: Types.ObjectId }
+type TagType = InferSchemaType<typeof tagSchema> & {
+  _id: Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /**
- * 3. Define instance methods
+ * Instance methods
  */
 interface TagMethods {
   getSlug(this: TagDoc): string;
 }
 
 /**
- * 4. Define statics
+ * Statics
  */
 interface TagStatics {
   findByName(this: TagModel, name: string): Promise<TagDoc | null>;
   findOrCreate(this: TagModel, name: string): Promise<TagDoc>;
 }
 
-/**
- * 5. Combine into document & model types
- */
 type TagDoc = HydratedDocument<TagType, TagMethods>;
 type TagModel = Model<TagType, {}, TagMethods> & TagStatics;
 
 /**
- * 6. Add methods
+ * Methods
  */
 tagSchema.methods.getSlug = function (this: TagDoc) {
   return this.name.toLowerCase().replace(/\s+/g, '-');
 };
 
 /**
- * 7. Add statics
+ * Statics
  */
 tagSchema.statics.findByName = function (name: string) {
   return this.findOne({ name: new RegExp(`^${name}$`, 'i') });
@@ -78,7 +75,7 @@ tagSchema.statics.findOrCreate = async function (name: string) {
 };
 
 /**
- * 8. Add virtuals (index not needed as name field already has unique: true)
+ * Virtuals
  */
 tagSchema.virtual('blogs', {
   ref: 'Blog',
@@ -87,16 +84,13 @@ tagSchema.virtual('blogs', {
 });
 
 /**
- * 10. Middleware (typed this)
+ * Middleware
  */
 tagSchema.pre<Query<TagDoc[], TagDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
   next();
 });
 
-/**
- * 11. Export model
- */
 const Tag = model<TagType, TagModel>("Tag", tagSchema);
 
 export { Tag, TagType, TagDoc, TagModel };

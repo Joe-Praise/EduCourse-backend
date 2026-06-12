@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { PopulateOptions, Query } from 'mongoose';
+import { Types, type PopulateOptions, type Query } from 'mongoose';
 import APIFeatures from '../utils/apiFeatures.js';
 import AppError from '../utils/appError.js';
 import catchAsync from '../utils/catchAsync.js';
@@ -162,7 +162,16 @@ export const createOne = (Model: MongooseModel, popOptions?: PopOptions) =>
 export const getOne = (Model: MongooseModel, popOptions?: PopOptions) =>
   catchAsync(async (req: Request, res: Response, next: NextFunction) => {
     const { id } = req.params;
-    
+
+    // Defense in depth: if a literal-path route (e.g. /me, /preferences) is
+    // accidentally registered AFTER `/:id`, the request would fall through
+    // here with `id = "me"`. Mongoose would then throw an opaque CastError.
+    // Return a clean 404 instead so the client gets actionable feedback and
+    // Sentry isn't spammed with cast errors.
+    if (!Types.ObjectId.isValid(id)) {
+      return next(new AppError('No document found with that ID', 404));
+    }
+
     // Generate cache key - use model name if available, otherwise use 'resource'
     const modelName = popOptions?.modelName || 'resource';
     const cacheKey = CacheKeyBuilder.resourceKey(modelName?.toLowerCase(), id);

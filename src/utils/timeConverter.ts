@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
@@ -87,7 +88,7 @@ const formatCreatedAt = (
     
   } catch (error) {
     // Enterprise error handling - log but don't throw
-    console.error('Date formatting error:', error);
+    logger.error('Date formatting error:', error);
     return null;
   }
 };
@@ -120,7 +121,7 @@ const formatDate = (
     return localDate.format(formats[options.format || 'medium']);
     
   } catch (error) {
-    console.error('Date formatting error:', error);
+    logger.error('Date formatting error:', error);
     return null;
   }
 };
@@ -146,7 +147,7 @@ const getRelativeTime = (
     return date.from(base);
     
   } catch (error) {
-    console.error('Relative time calculation error:', error);
+    logger.error('Relative time calculation error:', error);
     return null;
   }
 };
@@ -170,7 +171,7 @@ const convertTimezone = (
     return date.isValid() ? date.tz(toTz) : null;
     
   } catch (error) {
-    console.error('Timezone conversion error:', error);
+    logger.error('Timezone conversion error:', error);
     return null;
   }
 };

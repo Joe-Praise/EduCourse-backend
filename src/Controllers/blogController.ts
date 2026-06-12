@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { Document } from 'mongoose';
-import sharp from 'sharp';
 import  catchAsync  from '../utils/catchAsync.js';
 import  AppError  from '../utils/appError.js';
+import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
 import APIFeatures from '../utils/apiFeatures.js';
 import Pagination from '../utils/paginationFeatures.js';
 import { formatDate } from '../utils/timeConverter.js';
@@ -53,7 +53,6 @@ interface BlogDocument extends Document {
 
 // Constants
 const BLOG_AUTOCOMPLETE_INDEX_NAME = 'blogAutocomplete';
-const BLOG_IMAGE_DIMENSIONS = { width: 700, height: 700 };
 const AUTOCOMPLETE_MIN_QUERY_LENGTH = 2;
 const AUTOCOMPLETE_LIMIT = 10;
 
@@ -225,35 +224,27 @@ export const getAllBlog = catchAsync(
 );
 
 /**
- * Resize and optimize blog cover images
- * Uses sharp for efficient image processing
+ * Upload blog cover images to Cloudinary.
+ * Resize variants are produced via Cloudinary URL transforms at read time.
  */
 export const resizePhoto = catchAsync(
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     if (!req.file) return next();
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const userId = (req as any).user?.id || 'anonymous';
-    req.file.filename = `blog-${userId}-${timestamp}.jpeg`;
-
-    try {
-      await sharp(req.file.buffer)
-        .resize(BLOG_IMAGE_DIMENSIONS.width, BLOG_IMAGE_DIMENSIONS.height, {
-          fit: 'cover',
-          position: 'center'
-        })
-        .toFormat('jpeg')
-        .jpeg({ 
-          quality: 90,
-          progressive: true
-        })
-        .toFile(`public/blog/${req.file.filename}`);
-
-      next();
-    } catch (error) {
-      return next(new AppError('Image processing failed', 500));
+    const blogId = req.params.id;
+    if (!blogId) {
+      return next(
+        new AppError('Blog ID is required to upload a cover image.', 400),
+      );
     }
+
+    const result = await uploadBufferToCloudinary({
+      buffer: req.file.buffer,
+      publicId: `building-safety/blogs/${blogId}`,
+    });
+
+    req.file.filename = result.secure_url;
+    next();
   }
 );
 

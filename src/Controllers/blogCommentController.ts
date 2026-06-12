@@ -6,6 +6,10 @@ import Pagination from '../utils/paginationFeatures.js';
 import { createOne, getOne, updateOne, deleteOne } from './handlerFactory.js';
 import { formatDate } from '../utils/timeConverter.js';
 import { BlogComment } from '../models/blogCommentModel.js';
+import { CacheEvent } from '../events/cache/cache.events.js';
+
+// Import cache events to register listeners
+import '../events/cache/blogCommentCache.events.js';
 
 /**
  * Blog Comment Controller
@@ -83,7 +87,7 @@ export const getAllBlogComments = catchAsync(
 );
 
 // CRUD operations using factory functions
-export const createBlogComment = createOne(BlogComment);
-export const getBlogComment = getOne(BlogComment);
-export const updateBlogComment = updateOne(BlogComment);
-export const deleteBlogComment = deleteOne(BlogComment);
+export const createBlogComment = createOne(BlogComment, { cachePattern: CacheEvent.BLOG_COMMENT.CREATED });
+export const getBlogComment = getOne(BlogComment, { modelName: 'blogcomment' });
+export const updateBlogComment = updateOne(BlogComment, { cachePattern: CacheEvent.BLOG_COMMENT.UPDATED });
+export const deleteBlogComment = deleteOne(BlogComment, { cachePattern: CacheEvent.BLOG_COMMENT.DELETED });

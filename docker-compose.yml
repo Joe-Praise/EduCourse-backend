@@ -13,10 +13,13 @@ services:
     build: .
     env_file:
       - config.env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
     container_name: 'node-app'
     restart: always
     ports:
-      - 3050:3050
+      - 4050:3050
     depends_on:
       - mongo
       - redis
@@ -42,7 +45,6 @@ services:
 volumes:
   mongo-data:
   redis-data:
-
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
 # start the database before your application. The `db-data` volume persists the

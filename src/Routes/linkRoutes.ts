@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect } from '../middlewares/authMiddleware.js';
+import { strictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
 import {
   getAllLinks,
   createLink,
@@ -9,6 +10,7 @@ import {
 } from '../Controllers/linkController.js';
 
 const router = express.Router();
+router.use(strictXssSanitizer);
 
 router.route('/').get(getAllLinks).post(createLink);
 

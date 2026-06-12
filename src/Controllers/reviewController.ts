@@ -3,7 +3,8 @@ import catchAsync  from '../utils/catchAsync.js';
 import { formatDate } from '../utils/timeConverter.js';
 import APIFeatures from '../utils/apiFeatures.js';
 import Pagination from '../utils/paginationFeatures.js';
-import { createOne, deleteOne, getOne } from './handlerFactory.js';
+import { deleteOne, getOne } from './handlerFactory.js';
+import { safeTriggerAgent } from '../services/agentService.js';
 import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { cacheManager } from '../utils/cacheManager.js';
 import { CacheEvent } from '../events/cache/cache.events.js';
@@ -28,9 +29,24 @@ export const setCourseUserIds = catchAsync(async (req: AuthenticatedRequest, res
   next();
 });
 
-export const createReview = createOne(Review, { 
-  cachePattern: CacheEvent.REVIEW.CREATED 
-});
+export const createReview = catchAsync(
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const review = await Review.create(req.body);
+
+    appEvents.emit(CacheEvent.REVIEW.CREATED, review);
+
+    // Non-blocking sentiment analysis
+    safeTriggerAgent('review-sentiment-analyzer', {
+      reviewId:    review._id.toString(),
+      courseId:    (review as any).courseId?.toString(),
+      text:        (review as any).text ?? '',
+      rating:      (review as any).rating ?? 0,
+      initiatedBy: `user:${(review as any).userId}`,
+    });
+
+    res.status(201).json({ status: 'success', data: review });
+  },
+);
 
 export const getAllReview = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   let filter: any = {};

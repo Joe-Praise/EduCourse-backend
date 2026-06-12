@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 /**
  * Redis Cache Management Utilities for Authentication System
  * 
@@ -17,7 +18,7 @@ export const displayPermissionCache = async (): Promise<void> => {
     const pattern = `${CACHE_PREFIX}*`;
     const keys = await redis.keys(pattern);
     
-    console.log(`📊 Found ${keys.length} cached permissions:\n`);
+    logger.debug(`📊 Found ${keys.length} cached permissions:\n`);
     
     for (const key of keys) {
       const value = await redis.get(key);
@@ -30,17 +31,17 @@ export const displayPermissionCache = async (): Promise<void> => {
       const resource = parts[4] || 'any';
       const action = parts[5] || 'any';
       
-      console.log(`🔑 Key: ${key}`);
-      console.log(`   User: ${userId}`);
-      console.log(`   Roles: ${roles}`);
-      console.log(`   Resource: ${resource}`);
-      console.log(`   Action: ${action}`);
-      console.log(`   Allowed: ${value}`);
-      console.log(`   TTL: ${ttl > 0 ? `${ttl}s` : 'expired'}`);
-      console.log('');
+      logger.debug(`🔑 Key: ${key}`);
+      logger.debug(`   User: ${userId}`);
+      logger.debug(`   Roles: ${roles}`);
+      logger.debug(`   Resource: ${resource}`);
+      logger.debug(`   Action: ${action}`);
+      logger.debug(`   Allowed: ${value}`);
+      logger.debug(`   TTL: ${ttl > 0 ? `${ttl}s` : 'expired'}`);
+      logger.debug('');
     }
   } catch (error) {
-    console.error('❌ Error displaying cache:', error);
+    logger.error('❌ Error displaying cache:', error);
   }
 };
 
@@ -61,10 +62,10 @@ export const cleanExpiredCache = async (): Promise<number> => {
       }
     }
     
-    console.log(`🧹 Cleaned ${cleanedCount} expired cache entries`);
+    logger.debug(`🧹 Cleaned ${cleanedCount} expired cache entries`);
     return cleanedCount;
   } catch (error) {
-    console.error('❌ Error cleaning cache:', error);
+    logger.error('❌ Error cleaning cache:', error);
     return 0;
   }
 };
@@ -102,7 +103,7 @@ export const monitorCacheMetrics = async (): Promise<{
       userDistribution
     };
   } catch (error) {
-    console.error('❌ Error monitoring metrics:', error);
+    logger.error('❌ Error monitoring metrics:', error);
     return { totalKeys: 0, avgTTL: 0, userDistribution: {} };
   }
 };
@@ -147,7 +148,7 @@ export const exportCacheData = async (): Promise<Array<{
     
     return exportData;
   } catch (error) {
-    console.error('❌ Error exporting cache data:', error);
+    logger.error('❌ Error exporting cache data:', error);
     return [];
   }
 };
@@ -165,7 +166,7 @@ export const testCachePerformance = async (iterations: number = 100): Promise<{
   // Test write performance
   const writeStart = Date.now();
   for (let i = 0; i < iterations; i++) {
-    await redis.setex(`${testKey}:${i}`, 60, JSON.stringify(true));
+    await redis.set(`${testKey}:${i}`, JSON.stringify(true), { EX: 60 });
   }
   const writeTime = Date.now() - writeStart;
   
@@ -201,12 +202,12 @@ if (process.argv.includes('--clean')) {
 
 if (process.argv.includes('--monitor')) {
   monitorCacheMetrics().then(metrics => {
-    console.log('📈 Cache Metrics:', metrics);
+    logger.debug('📈 Cache Metrics:', metrics);
   });
 }
 
 if (process.argv.includes('--test-performance')) {
   testCachePerformance(50).then(results => {
-    console.log('⚡ Performance Test Results:', results);
+    logger.debug('⚡ Performance Test Results:', results);
   });
 }

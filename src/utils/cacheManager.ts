@@ -33,4 +33,20 @@ export const cacheManager = {
   async remove(key: string): Promise<void> {
     await redis.del(key);
   },
+
+  /**
+   * Delete every key matching a glob pattern (e.g. "cache:course*").
+   * Uses SCAN (non-blocking) so it's safe on large keyspaces. Use this to
+   * invalidate all query/list variants of a resource after a write that the
+   * per-key list helpers can't reach (e.g. an AI course import).
+   */
+  async removePattern(pattern: string): Promise<void> {
+    const keys: string[] = [];
+    for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 200 })) {
+      keys.push(key as unknown as string);
+    }
+    if (keys.length > 0) {
+      await redis.del(keys);
+    }
+  },
 };
