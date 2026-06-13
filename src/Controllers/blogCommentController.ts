@@ -87,14 +87,7 @@ export const getAllBlogComments = catchAsync(
 );
 
 // CRUD operations using factory functions
-<<<<<<< HEAD:Controllers/blogCommentController.ts
-export const createBlogComment = createOne(BlogComment as any);
-export const getBlogComment = getOne(BlogComment as any);
-export const updateBlogComment = updateOne(BlogComment as any);
-export const deleteBlogComment = deleteOne(BlogComment as any);
-=======
 export const createBlogComment = createOne(BlogComment, { cachePattern: CacheEvent.BLOG_COMMENT.CREATED });
 export const getBlogComment = getOne(BlogComment, { modelName: 'blogcomment' });
 export const updateBlogComment = updateOne(BlogComment, { cachePattern: CacheEvent.BLOG_COMMENT.UPDATED });
 export const deleteBlogComment = deleteOne(BlogComment, { cachePattern: CacheEvent.BLOG_COMMENT.DELETED });
->>>>>>> e78b148218335e7cc3b2ea58283d17dc29aa7626:src/Controllers/blogCommentController.ts

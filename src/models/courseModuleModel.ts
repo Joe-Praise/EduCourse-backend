@@ -56,25 +56,9 @@ courseModuleSchema.virtual('lessons', {
   localField: '_id',
 });
 
-<<<<<<< HEAD:models/courseModuleModel.ts
-// courseSchema.virtual('reviews', {
-//   ref: 'Review',
-//   foreignField: 'courseId',
-//   localField: '_id',
-// });
-
-courseModuleSchema.pre(/^find/, function (next: () => void) {
-  (this as any).find({ active: { $ne: false } });
-
-  (this as any).populate({
-    path: 'lessons',
-    select: '-__v',
-  });
-=======
 courseModuleSchema.pre<Query<CourseModuleDoc[], CourseModuleDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
   this.populate({ path: 'lessons', select: '-__v' });
->>>>>>> e78b148218335e7cc3b2ea58283d17dc29aa7626:src/models/courseModuleModel.ts
   next();
 });
 

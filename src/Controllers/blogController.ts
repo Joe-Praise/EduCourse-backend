@@ -13,12 +13,9 @@ import { CacheEvent } from '../events/cache/cache.events.js';
 
 import { Blog } from '../models/blogModel.js';
 import handleImageUpload from '../utils/handleImageUpload.js';
-<<<<<<< HEAD:Controllers/blogController.ts
-=======
 
 // Import cache events to register listeners
 import '../events/cache/blogCache.events.js';
->>>>>>> e78b148218335e7cc3b2ea58283d17dc29aa7626:src/Controllers/blogController.ts
 
 /**
  * Blog Controller
@@ -62,24 +59,17 @@ const AUTOCOMPLETE_LIMIT = 10;
 /**
  * CRUD operations using factory functions
  */
-<<<<<<< HEAD:Controllers/blogController.ts
-export const createBlog = createOne(Blog as any, { field: 'title' });
-export const getBlog = getOne(Blog as any, { path: 'comments' });
-export const updateBlog = updateOne(Blog as any);
-export const deleteBlog = deleteOne(Blog as any);
-=======
-export const createBlog = createOne(Blog, { 
-  field: 'title', 
-  cachePattern: CacheEvent.BLOG.CREATED 
+export const createBlog = createOne(Blog, {
+  field: 'title',
+  cachePattern: CacheEvent.BLOG.CREATED
 });
 export const getBlog = getOne(Blog, { path: 'comments' });
-export const updateBlog = updateOne(Blog, { 
-  cachePattern: CacheEvent.BLOG.UPDATED 
+export const updateBlog = updateOne(Blog, {
+  cachePattern: CacheEvent.BLOG.UPDATED
 });
-export const deleteBlog = deleteOne(Blog, { 
-  cachePattern: CacheEvent.BLOG.DELETED 
+export const deleteBlog = deleteOne(Blog, {
+  cachePattern: CacheEvent.BLOG.DELETED
 });
->>>>>>> e78b148218335e7cc3b2ea58283d17dc29aa7626:src/Controllers/blogController.ts
 
 /**
  * Configure multer for single image upload

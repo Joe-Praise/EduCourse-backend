@@ -9,7 +9,7 @@ export const cache = {
   },
 
   async get<T>(key: string): Promise<T | null> {
-    const data = await redis.get(key);
+    const data = (await redis.get(key)) as string | null;
     logger.debug('coming from cache: ', data);
     return data ? (JSON.parse(data) as T) : null;
   },
