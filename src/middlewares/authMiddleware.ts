@@ -196,7 +196,7 @@ const getCacheKey = (
  */
 const getFromCache = async (key: string): Promise<boolean | string | null> => {
   try {
-    const result = await redis.get(key);
+    const result = (await redis.get(key)) as string | null;
     return result ? JSON.parse(result) : null;
   } catch (error) {
     logger.warn('⚠️ Redis cache read error:', error);

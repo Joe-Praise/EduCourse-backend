@@ -59,16 +59,16 @@ const AUTOCOMPLETE_LIMIT = 10;
 /**
  * CRUD operations using factory functions
  */
-export const createBlog = createOne(Blog, { 
-  field: 'title', 
-  cachePattern: CacheEvent.BLOG.CREATED 
+export const createBlog = createOne(Blog, {
+  field: 'title',
+  cachePattern: CacheEvent.BLOG.CREATED
 });
 export const getBlog = getOne(Blog, { path: 'comments' });
-export const updateBlog = updateOne(Blog, { 
-  cachePattern: CacheEvent.BLOG.UPDATED 
+export const updateBlog = updateOne(Blog, {
+  cachePattern: CacheEvent.BLOG.UPDATED
 });
-export const deleteBlog = deleteOne(Blog, { 
-  cachePattern: CacheEvent.BLOG.DELETED 
+export const deleteBlog = deleteOne(Blog, {
+  cachePattern: CacheEvent.BLOG.DELETED
 });
 
 /**

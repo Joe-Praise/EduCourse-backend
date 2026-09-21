@@ -1,0 +1,1 @@
+{"version":3,"file":"strictXssSanitizer.d.ts","sourceRoot":"","sources":["../../src/middlewares/strictXssSanitizer.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,OAAO,EAAE,QAAQ,EAAE,YAAY,EAAE,MAAM,SAAS,CAAC;AAE1D;;;;GAIG;AACH,eAAO,MAAM,kBAAkB,GAC7B,KAAK,OAAO,EACZ,MAAM,QAAQ,EACd,MAAM,YAAY,KACjB,IAKF,CAAC"}

@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger.js';
-import { createClient } from "redis";
+import { createClient, type RedisClientType } from "redis";
 
-const redis = createClient({
+const redis: RedisClientType = createClient({
   url: process.env.REDIS_URL || "redis://localhost:6379",
 });
 

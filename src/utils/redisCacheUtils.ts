@@ -21,7 +21,7 @@ export const displayPermissionCache = async (): Promise<void> => {
     logger.debug(`📊 Found ${keys.length} cached permissions:\n`);
     
     for (const key of keys) {
-      const value = await redis.get(key);
+      const value = (await redis.get(key)) as string | null;
       const ttl = await redis.ttl(key);
       
       // Parse key components: auth:perm:userId:roles:resource:action
@@ -126,7 +126,7 @@ export const exportCacheData = async (): Promise<Array<{
     const exportData = [];
     
     for (const key of keys) {
-      const value = await redis.get(key);
+      const value = (await redis.get(key)) as string | null;
       const ttl = await redis.ttl(key);
       
       const parts = key.split(':');
