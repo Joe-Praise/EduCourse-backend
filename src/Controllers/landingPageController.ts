@@ -38,6 +38,52 @@ const FetchLandingPageData = async (
   return doc;
 };
 
+/**
+ * Categories for the landing-page bento.
+ *
+ * Only categories that at least one PUBLISHED course actually uses are
+ * returned, ordered by how many courses they hold. A plain `Category.find()`
+ * used to surface the oldest seeded categories — most of them empty — so every
+ * bento tile linked to `/courses?category=<id>`, a guaranteed zero-result
+ * page. `courseCount` feeds the tile subtitle.
+ *
+ * The aggregation bypasses the `/^find/` middleware on Course, so the
+ * published + active filters are applied explicitly here.
+ */
+const FetchLandingPageCategories = async (limit: number): Promise<any[]> => {
+  const grouped = await Course.aggregate([
+    {
+      $match: {
+        publishedStatus: 'published',
+        active: { $ne: false },
+        category: { $ne: null },
+      },
+    },
+    { $group: { _id: '$category', courseCount: { $sum: 1 } } },
+    { $sort: { courseCount: -1, _id: 1 } },
+    { $limit: limit },
+  ]);
+
+  if (grouped.length === 0) return [];
+
+  const countById = new Map<string, number>(
+    grouped.map((g: any) => [String(g._id), g.courseCount as number]),
+  );
+
+  const categories = await Category.find({
+    _id: { $in: grouped.map((g: any) => g._id) },
+  });
+
+  // Preserve the aggregation order (most courses first) — Category.find()
+  // returns them in natural order.
+  return categories
+    .map((cat: any) => ({
+      ...(cat._doc ?? cat),
+      courseCount: countById.get(String(cat._id)) ?? 0,
+    }))
+    .sort((a: any, b: any) => b.courseCount - a.courseCount);
+};
+
 export const landingPage = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const cacheKey = CacheKeyBuilder.listKey('landing-page-data');
@@ -59,7 +105,7 @@ export const landingPage = catchAsync(
     const courses = await FetchLandingPageData(Course, limit);
     const blogs = await FetchLandingPageData(Blog, limit);
     const instructors = await FetchLandingPageData(Instructor, instructorLimit);
-    const categories = await Category.find().limit(categoryLimit);
+    const categories = await FetchLandingPageCategories(categoryLimit);
 
     const data = {
       courses,
