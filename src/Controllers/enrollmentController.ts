@@ -9,17 +9,11 @@ import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { cacheManager } from '../utils/cacheManager.js';
 
 import { Enrollment } from '../models/enrollmentModel.js';
-import { CompletedCourse } from '../models/completedcourseModel.js';
-import { InstructorEarning } from '../models/instructorEarningModel.js';
-import { Notification } from '../models/notificationModel.js';
-import { Instructor } from '../models/instructorModel.js';
 
 // Register cache event listeners
 import '../events/cache/enrollmentCache.events.js';
 import '../events/cache/instructorEarningCache.events.js';
 import '../events/cache/notificationCache.events.js';
-
-const PLATFORM_FEE_RATE = 0.3; // 30% platform fee
 
 interface AuthenticatedRequest extends Request {
   user?: { _id: string; role: string[] };
@@ -27,66 +21,33 @@ interface AuthenticatedRequest extends Request {
 
 export const createEnrollment = catchAsync(
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    const { userId, courseId, paymentRef } = req.body;
+    const { courseId, paymentRef } = req.body;
+    const requesterId = req.user?._id;
+    const isAdmin = req.user?.role?.includes('admin') ?? false;
 
-    if (!userId || !courseId) {
-      return next(new AppError('userId and courseId are required', 400));
+    if (!requesterId) {
+      return next(new AppError('You are not logged in', 401));
+    }
+    if (!courseId) {
+      return next(new AppError('courseId is required', 400));
     }
 
-    // Check for duplicate enrollment
-    const existing = await Enrollment.findOne({ userId, courseId });
-    if (existing) {
-      return next(new AppError('User is already enrolled in this course', 409));
+    // Users enroll themselves; only admins may enroll someone else.
+    const userId = req.body.userId ?? requesterId;
+    if (!isAdmin && String(userId) !== String(requesterId)) {
+      return next(new AppError('You can only enroll yourself in a course', 403));
     }
 
-    // Create enrollment
-    const enrollment = await Enrollment.create({ userId, courseId, paymentRef });
+    const { enrollment, completedCourse, earning, notification } =
+      await Enrollment.enrollUser({ userId, courseId, paymentRef });
 
-    // Create CompletedCourse record for backward compatibility with My Learning
-    const completedExists = await CompletedCourse.findOne({ userId, courseId });
-    if (!completedExists) {
-      await CompletedCourse.create({ userId, courseId });
-      appEvents.emit(CacheEvent.COMPLETED_COURSE.CREATED, { userId, courseId });
+    // Emitted only after the transaction has committed.
+    if (completedCourse) {
+      appEvents.emit(CacheEvent.COMPLETED_COURSE.CREATED, completedCourse);
     }
-
-    // Find instructor for this course to record earnings
-    const instructor = await Instructor.findOne({ courses: courseId }).populate({
-      path: 'courses',
-      match: { _id: courseId },
-    });
-
-    if (instructor) {
-      // Get course price for earning calculation
-      const courseData = (enrollment as any).courseId;
-      const amount: number =
-        typeof courseData === 'object' && courseData?.price ? courseData.price : 0;
-
-      if (amount > 0) {
-        const platformFee = Math.round(amount * PLATFORM_FEE_RATE * 100) / 100;
-        const netEarning = Math.round((amount - platformFee) * 100) / 100;
-
-        const earning = await InstructorEarning.create({
-          instructorId: instructor._id,
-          courseId,
-          enrollmentId: enrollment._id,
-          amount,
-          platformFee,
-          netEarning,
-        });
-
-        appEvents.emit(CacheEvent.INSTRUCTOR_EARNING.CREATED, earning);
-      }
+    if (earning) {
+      appEvents.emit(CacheEvent.INSTRUCTOR_EARNING.CREATED, earning);
     }
-
-    // Create welcome notification for the enrolled user
-    const notification = await Notification.create({
-      userId,
-      type: 'enrollment',
-      title: 'Enrollment Confirmed',
-      message: 'You have successfully enrolled in the course.',
-      link: `/my-courses/learning`,
-    });
-
     appEvents.emit(CacheEvent.NOTIFICATION.CREATED, notification);
     appEvents.emit(CacheEvent.ENROLLMENT.CREATED, enrollment);
 

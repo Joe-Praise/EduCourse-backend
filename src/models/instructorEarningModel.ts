@@ -90,6 +90,25 @@ type InstructorEarningDoc = HydratedDocument<InstructorEarningType, InstructorEa
 type InstructorEarningModel = Model<InstructorEarningType, {}, InstructorEarningMethods> &
   InstructorEarningStatics;
 
+/** Share of every sale the platform keeps; the instructor receives the rest. */
+export const PLATFORM_FEE_RATE = 0.3;
+
+/**
+ * Splits a sale amount into platform fee and instructor net, rounded to cents.
+ * Net is derived from the rounded fee so `platformFee + netEarning === amount`.
+ */
+export function calculateEarningSplit(
+  amount: number,
+  feeRate: number = PLATFORM_FEE_RATE,
+): { platformFee: number; netEarning: number } {
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new RangeError(`Invalid earning amount: ${amount}`);
+  }
+  const platformFee = Math.round(amount * feeRate * 100) / 100;
+  const netEarning = Math.round((amount - platformFee) * 100) / 100;
+  return { platformFee, netEarning };
+}
+
 instructorEarningSchema.statics.totalEarningsByInstructor = async function (
   instructorId: string,
 ) {

@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import  catchAsync from '../utils/catchAsync.js';
 import  AppError from '../utils/appError.js';
-import { getAll, updateOne, deleteOne, getOne } from './handlerFactory.js';
+import { updateOne, deleteOne, getOne } from './handlerFactory.js';
 import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { cacheManager } from '../utils/cacheManager.js';
 import { CacheEvent } from '../events/cache/cache.events.js';

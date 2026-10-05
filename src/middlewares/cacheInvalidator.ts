@@ -34,7 +34,6 @@ export const cacheInvalidator =
 
               // Otherwise, perform SCAN-based pattern deletion
               let cursor = "0";
-              let totalDeleted = 0;
 
               do {
                 const { cursor: nextCursor, keys } = await redis.scan(cursor, {
@@ -47,11 +46,9 @@ export const cacheInvalidator =
                 if (keys.length > 0) {
                   // redis.del expects individual keys; spread the array
                   await redis.del(keys);
-                  totalDeleted += keys.length;
                 }
               } while (cursor !== "0");
 
-              // logger.debug(`🧹 Cleared ${totalDeleted} cache entries for pattern: ${pattern}`);
             }
           } catch (error) {
             logger.error("❌ Cache invalidation error:", error);

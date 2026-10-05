@@ -1,4 +1,3 @@
-import { logger } from './utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express, { Request, Response, NextFunction } from 'express';

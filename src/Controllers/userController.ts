@@ -1,4 +1,3 @@
-import { logger } from '../utils/logger.js';
 import multer from 'multer';
 import { User } from '../models/userModel.js';
 import { uploadBufferToCloudinary } from '../utils/cloudinary.js';

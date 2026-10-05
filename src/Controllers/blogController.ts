@@ -23,26 +23,6 @@ import '../events/cache/blogCache.events.js';
  */
 
 // Type definitions
-interface BlogRequest extends Request {
-  params: {
-    id?: string;
-  };
-  query: {
-    slug?: string;
-    query?: string;
-    page?: string;
-    limit?: string;
-    sort?: string;
-    fields?: string;
-    [key: string]: any;
-  };
-  user?: {
-    id: string;
-    [key: string]: any;
-  };
-  file?: any; // Multer file type
-}
-
 interface BlogDocument extends Document {
   _doc?: any;
   createdAt: Date;

@@ -164,15 +164,6 @@ export const getAllCourses = catchAsync(
     const { slug, userId } = req.query;
 
     const cacheKey = CacheKeyBuilder.listKey('course', req.query);
-    const cachedResult = await cacheManager.get(cacheKey);
-
-    // if (cachedResult) {
-    //   return res.status(200).json({
-    //     status: 'success',
-    //     metaData: cachedResult.metaData,
-    //     data: cachedResult.data,
-    //   });
-    // }
 
     let query: any;
     if (slug) {
@@ -523,8 +514,8 @@ export const searchMyLearningCourse = catchAsync(
       .sort({ score: { $meta: 'textScore' } })
       .lean();
 
-    let data = doc.map((el: any) => {
-      const { active, ...courseData } = el;
+    const data = doc.map((el: any) => {
+      const { active: _active, ...courseData } = el;
       return {
         ...courseData,
         createdAt: formatDate(courseData.createdAt),

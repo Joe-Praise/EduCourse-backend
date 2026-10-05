@@ -89,7 +89,10 @@ export default (err: MongoError, req: Request, res: Response, _next: NextFunctio
 
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
-  } else if (process.env.NODE_ENV === 'production') {
+  } else {
+    // Every other environment (production, staging, test, unset) gets the
+    // safe production shaping. Matching only 'production' here left requests
+    // hanging with no response whenever NODE_ENV was anything else.
     // dont know why using error.name is not working but err.name
     if (err.name === 'CastError') err = handleCastErrorDB(err);
     if (err.code === 11000) err = handleDuplicateFieldsDB(err);

@@ -212,14 +212,6 @@ const setInCache = async (key: string, value: boolean): Promise<void> => {
   }
 };
 
-const deleteFromCache = async (key: string): Promise<void> => {
-  try {
-    await redis.del(key);
-  } catch (error) {
-    logger.warn('⚠️ Redis cache delete error:', error);
-  }
-};
-
 /**
  * Role restriction middleware with caching and hierarchy
  * @param roles - Required roles for access

@@ -5,7 +5,8 @@ import {
   Model,
   InferSchemaType,
   Types,
-  Query
+  Query,
+  ClientSession,
 } from 'mongoose';
 import { Course } from './courseModel.js';
 
@@ -64,7 +65,7 @@ interface CompletedCourseMethods {
  * Statics
  */
 interface CompletedCourseStatics {
-  totalNumberOfStudents(courseId: Types.ObjectId): Promise<void>;
+  totalNumberOfStudents(courseId: Types.ObjectId, session?: ClientSession | null): Promise<void>;
   findByCourse(courseId: string): Promise<CompletedCourseDoc[]>;
   findByUser(userId: string): Promise<CompletedCourseDoc[]>;
 }
@@ -93,14 +94,17 @@ completedcourseSchema.methods.getCompletionPercentage = function (
  */
 completedcourseSchema.statics.totalNumberOfStudents = async function (
   courseId: Types.ObjectId,
+  session: ClientSession | null = null,
 ): Promise<void> {
+  // Runs inside the caller's transaction when one is active, so the count
+  // includes the not-yet-committed CompletedCourse that triggered it.
   const stats = await this.aggregate([
     { $match: { courseId } },
     { $count: 'studentsQuantity' },
-  ]);
+  ]).session(session);
 
   const studentsQuantity = stats.length > 0 ? stats[0].studentsQuantity : 0;
-  await Course.findByIdAndUpdate(courseId, { studentsQuantity });
+  await Course.findByIdAndUpdate(courseId, { studentsQuantity }, { session });
 };
 
 completedcourseSchema.statics.findByCourse = function (courseId: string) {
@@ -134,8 +138,11 @@ completedcourseSchema.pre<Query<CompletedCourseDoc[], CompletedCourseDoc>>(
 /**
  * Post-save hook: update denormalised student count on Course
  */
-completedcourseSchema.post('save', function (this: CompletedCourseDoc) {
-  (this.constructor as CompletedCourseModel).totalNumberOfStudents(this.courseId);
+completedcourseSchema.post('save', async function (this: CompletedCourseDoc) {
+  await (this.constructor as CompletedCourseModel).totalNumberOfStudents(
+    this.courseId,
+    this.$session(),
+  );
 });
 
 completedcourseSchema.pre<Query<CompletedCourseDoc, CompletedCourseDoc>>(

@@ -1,11 +1,5 @@
 import type { Request } from "express";
 
-interface CacheKeyOptions {
-  id?: string;
-  resource?: string;
-  query?: Record<string, any>;
-}
-
 /**
  * Centralized utility for generating consistent cache keys across the app.
  * Handles single resources, lists, query strings, and pattern-based invalidation.
@@ -22,7 +16,10 @@ export const CacheKeyBuilder = {
    * 📜 List or query-based key (e.g., cache:courses:list:{"page":1,"sort":"asc"})
    */
   listKey(resource: string, query?: Record<string, any>): string {
-    const q = query ? JSON.stringify(query) : "";
+    // Sort keys so ?page=1&sort=x and ?sort=x&page=1 share one cache entry.
+    const q = query
+      ? JSON.stringify(Object.fromEntries(Object.entries(query).sort(([a], [b]) => a.localeCompare(b))))
+      : "";
     return `cache:${resource}:list:${q}`;
   },
 
