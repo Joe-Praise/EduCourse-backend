@@ -313,6 +313,26 @@ export const refreshAccessToken = catchAsync(
     }
 
     const tokenHash = RefreshToken.hashToken(raw);
+
+    // Rotate atomically: claim the token by flipping `revoked` in the same
+    // operation that checks it. A separate read-then-save would let two
+    // concurrent requests with the same token both pass the check and both
+    // receive fresh sessions, defeating reuse detection.
+    const claimed = await RefreshToken.findOneAndUpdate(
+      { tokenHash, revoked: false, expiresAt: { $gt: new Date() } },
+      { revoked: true },
+    );
+
+    if (claimed) {
+      const user = await User.findById(claimed.userId);
+      if (!user) {
+        return next(new AppError('User no longer exists', 401));
+      }
+      await createSendToken(user, 200, req, res);
+      return;
+    }
+
+    // Claim failed — work out why.
     const doc = await RefreshToken.findOne({ tokenHash });
 
     if (!doc) {
@@ -332,20 +352,7 @@ export const refreshAccessToken = catchAsync(
       return next(new AppError('Refresh token reused — session terminated', 401));
     }
 
-    if (doc.expiresAt.getTime() <= Date.now()) {
-      return next(new AppError('Refresh token expired', 401));
-    }
-
-    const user = await User.findById(doc.userId);
-    if (!user) {
-      return next(new AppError('User no longer exists', 401));
-    }
-
-    // Rotate: mark the old token revoked, issue a fresh pair.
-    doc.revoked = true;
-    await doc.save();
-
-    await createSendToken(user, 200, req, res);
+    return next(new AppError('Refresh token expired', 401));
   },
 );
 

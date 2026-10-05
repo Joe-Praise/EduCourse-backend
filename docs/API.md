@@ -26,7 +26,8 @@ Building Safety Project REST API. All endpoints served under `/api/v1/`.
 |---|---|---|---|
 | POST | `/users/signup` | — | Create account. Returns JWT + user. |
 | POST | `/users/login` | — | Sign in. Returns JWT, sets cookie + session. |
-| GET | `/users/logout` | — | Clear cookie + session. |
+| POST | `/users/refresh` | `rt` cookie | Rotate the refresh token: revokes the submitted one, returns a new access JWT and sets a new `rt` cookie. Reusing a revoked token revokes **all** the user's sessions. |
+| POST | `/users/logout` | — | Revoke the refresh token, clear cookies + session. |
 | POST | `/users/forgotPassword` | — | Send reset email (Resend). |
 | PATCH | `/users/resetPassword/:token` | — | Apply new password using reset token. |
 | PATCH | `/users/updatePassword` | 🔒 | Change password for authenticated user. |
@@ -106,7 +107,7 @@ Building Safety Project REST API. All endpoints served under `/api/v1/`.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/enrollments` | 🔒 | Enroll in a course. |
+| POST | `/enrollments` | 🔒 | Enroll the logged-in user in a published course. Body: `{ courseId, paymentRef? }`. `userId` may only differ from the caller for admins (else 403). Atomic: creates enrollment + progress record + instructor earning + notification in one transaction. 404 unknown/unpublished course, 409 already enrolled. |
 | GET | `/enrollments/check?userId=&courseId=` | 🔒 | Is user enrolled? |
 | GET | `/enrollments/user/:userId` | 🔒 | All enrollments for a user. |
 

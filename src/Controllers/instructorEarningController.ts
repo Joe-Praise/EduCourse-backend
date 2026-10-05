@@ -158,11 +158,6 @@ export const getDashboardOverview = catchAsync(
         ]),
       ]);
 
-    // Get courses for this instructor (bypasses publishedStatus filter)
-    const courses = await (Instructor as any).findAllByInstructor
-      ? []
-      : [];
-
     const overview = {
       totalStudents: totalStudents ?? 0,
       totalEarnings: totalEarnings[0]?.total ?? 0,

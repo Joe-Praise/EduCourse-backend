@@ -1,5 +1,5 @@
 import express from 'express';
-import { protect, requirePermission, restrictTo } from '../middlewares/authMiddleware.js';
+import { protect, requirePermission } from '../middlewares/authMiddleware.js';
 import { sanitizeRichText } from '../middlewares/richTextSanitizer.js';
 import {
   setCourseUserIds,

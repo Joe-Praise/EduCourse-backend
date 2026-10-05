@@ -1,5 +1,5 @@
 import express from 'express';
-import { protect, requirePermission, restrictTo } from '../middlewares/authMiddleware.js';
+import { protect, requirePermission } from '../middlewares/authMiddleware.js';
 import { strictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
 import {
   getAllLessons,

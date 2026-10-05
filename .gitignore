@@ -1,0 +1,14 @@
+node_modules
+config.env
+
+# Architecture docs (AI context files)
+CLAUDE.md
+AGENTS.md
+.claude
+REPO_MAP.md
+plans
+# Build output (Render runs `npm run build` on deploy)
+dist
+
+# Test coverage
+coverage

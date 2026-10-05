@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
 import catchAsync from '../utils/catchAsync.js';
 import {
-  getAll,
   getOne,
   createOne,
   updateOne,

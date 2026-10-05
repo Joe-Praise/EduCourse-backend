@@ -1,11 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
-import { Types, type PopulateOptions, type Query } from 'mongoose';
+import { Types, type Query } from 'mongoose';
 import APIFeatures from '../utils/apiFeatures.js';
 import AppError from '../utils/appError.js';
 import catchAsync from '../utils/catchAsync.js';
 import Pagination from '../utils/paginationFeatures.js';
 import { appEvents } from '../events/index.js';
-import { CacheEvent } from '../events/cache/cache.events.js';
 import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { cacheManager } from '../utils/cacheManager.js';
 
@@ -297,7 +296,7 @@ export const searchModel = (Model: MongooseModel) =>
 
     // Sanitize documents (remove internal fields)
     const sanitizedDocs = docs.map(doc => {
-      const { active, ...sanitized } = doc as any;
+      const { active: _active, ...sanitized } = doc as any;
       return sanitized;
     });
 

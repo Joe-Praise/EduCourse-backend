@@ -1,6 +1,7 @@
 name: CI
 
-# Runs typecheck + lint on every PR and on pushes to main.
+# Runs typecheck, lint, tests and build on every PR and on pushes to main.
+# Every step is blocking.
 
 on:
   pull_request:
@@ -18,7 +19,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Matches `engines` in package.json and the production runtime.
+          node-version-file: '.node-version'
           cache: 'npm'
 
       - name: Install dependencies
@@ -28,11 +30,20 @@ jobs:
         run: npm run typecheck
 
       - name: Lint
-        # Backend lint may fail on legacy files initially — `continue-on-error`
-        # so the PR isn't blocked while we burn down warnings. Flip to `false`
-        # once the lint baseline is clean.
-        continue-on-error: true
+        # Errors fail the build. `--max-warnings` in package.json caps the
+        # legacy `any` warnings: new ones fail CI, and the cap only goes down.
         run: npm run lint
+
+      - name: Cache MongoDB binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Test
+        # Integration tests boot an in-memory MongoDB replica set and an
+        # in-memory Redis stand-in — no external services needed.
+        run: npm test
 
       - name: Build
         run: npm run build

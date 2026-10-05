@@ -1,4 +1,3 @@
-import { logger } from './logger.js';
 import type { Query } from 'mongoose';
 
 interface QueryString {
