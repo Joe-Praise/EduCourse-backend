@@ -22,5 +22,10 @@ vi.mock('../../src/config/redisSession.js', async () => {
 
 vi.mock('../../src/middlewares/rateLimiter.js', () => {
   const passThrough = (_req: unknown, _res: unknown, next: () => void) => next();
-  return { globalLimiter: passThrough, authLimiter: passThrough, aiLimiter: passThrough };
+  return {
+    globalLimiter: passThrough,
+    authLimiter: passThrough,
+    aiLimiter: passThrough,
+    mcpLimiter: passThrough,
+  };
 });

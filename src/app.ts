@@ -36,6 +36,7 @@ import aiRouter from './Routes/aiRoutes.js';
 import searchRouter from './Routes/searchRoutes.js';
 import agentCallbackRouter from './Routes/agentCallbackRoutes.js';
 import platformRouter from './Routes/platformRoutes.js';
+import mcpRouter from './Routes/mcpRoutes.js';
 import corsOptions from './config/corsOptions.js';
 import credentials from './utils/credentials.js';
 import { sessionMiddleware } from './config/redisSession.js';
@@ -47,6 +48,11 @@ interface CustomRequest extends Request {
 }
 
 const app = express();
+
+// MCP (edcourse-content) is machine-to-machine with its own bearer auth, rate
+// limit and body cap. Mounted before the session middleware so tool calls
+// never mint a Redis session (saveUninitialized: true).
+app.use('/api/v1/mcp', mcpRouter);
 
 app.use(sessionMiddleware);
 
