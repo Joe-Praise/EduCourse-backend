@@ -191,6 +191,18 @@ Inbound webhooks from the external agent service. Auth via `X-API-Key` header va
 
 ---
 
+## MCP — `/mcp`
+
+The `edcourse-content` MCP server (Streamable HTTP, stateless, JSON responses). One read-only tool, `get_module_lessons`. Consumed by agent-service. Auth: `Authorization: Bearer <EDCOURSE_MCP_BEARER_TOKEN>`; unset token → 503. Mounted before the session middleware; own 60 req/min limiter and 10kb body cap. See [plans/4I.21E-EDCOURSE-MCP-SERVER.md](../plans/4I.21E-EDCOURSE-MCP-SERVER.md).
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/api/v1/mcp/edcourse-content` | Bearer | MCP JSON-RPC (`initialize`, `tools/list`, `tools/call`). |
+| GET, DELETE | `/api/v1/mcp/edcourse-content` | Bearer | 405 — no sessions or server streams. |
+| GET | `/api/v1/mcp/health` | — | `{ status, database: up|down, mcp: enabled|disabled }`. No DB query, no content. |
+
+---
+
 ## Landing page — `/`
 
 | Method | Path | Auth | Description |

@@ -41,3 +41,17 @@ export const aiLimiter = rateLimit({
   legacyHeaders: false,
   message: "Too many AI requests. Please wait before trying again.",
 });
+
+// MCP limiter — edcourse-content endpoint, 60 requests per minute per IP.
+// The only legitimate caller is agent-service; this bounds abuse of a leaked token.
+export const mcpLimiter = rateLimit({
+  store: new RedisStore({
+    sendCommand: (...args: string[]) => redis.sendCommand(args),
+    prefix: "rl:mcp:",
+  }),
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many MCP requests. Please wait before trying again.",
+});

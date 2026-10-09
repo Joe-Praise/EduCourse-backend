@@ -16,6 +16,7 @@ export default defineConfig({
       JWT_EXPIRES_IN: '15m',
       SESSION_SECRET: 'test-session-secret',
       AGENT_API_KEY: 'test-agent-api-key',
+      EDCOURSE_MCP_BEARER_TOKEN: 'test-mcp-bearer-token-0123456789abcdef',
     },
   },
 });
