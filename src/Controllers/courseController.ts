@@ -241,10 +241,19 @@ export const getAllCourses = catchAsync(
         const searchQuery = req.query.search.trim();
 
         // Check for an existing draft with this query (avoid duplicate triggers)
-        const existing = await Course.findOne({
-          importQuery: searchQuery,
-          publishedStatus: { $in: ['importing', 'published'] },
-        }).setOptions({ skipPublishedFilter: true });
+        const findImportDraft = () =>
+          Course.findOne({
+            importQuery: searchQuery,
+            publishedStatus: { $in: ['importing', 'published'] },
+          }).setOptions({ skipPublishedFilter: true });
+        const sendExisting = (course: NonNullable<Awaited<ReturnType<typeof findImportDraft>>>) =>
+          res.status(200).json({
+            status: 'success',
+            data: [(course as any)._doc ?? course],
+            importing: course.publishedStatus === 'importing',
+          });
+
+        const existing = await findImportDraft();
 
         // agent-service never reports a failed run back to us, so a draft that
         // is still 'importing' past the stale window is treated as dead: mark it
@@ -254,19 +263,23 @@ export const getAllCourses = catchAsync(
           Date.now() - new Date(existing.createdAt).getTime() > IMPORT_STALE_MS;
 
         if (existing && isStaleImport) {
-          logger.warn(
-            `[import] draft ${existing._id} for "${searchQuery}" stuck in importing → marking failed and re-triggering`,
-          );
-          await Course.updateOne(
-            { _id: existing._id },
+          // Conditional on still 'importing' so only one concurrent request
+          // claims the stale draft and re-triggers.
+          const claim = await Course.updateOne(
+            { _id: existing._id, publishedStatus: 'importing' },
             { $set: { publishedStatus: 'failed' } },
           );
+          if (claim.modifiedCount === 0) {
+            // Another request already claimed it and started the retry.
+            const current = await findImportDraft();
+            if (current) return sendExisting(current);
+          } else {
+            logger.warn(
+              `[import] draft ${existing._id} for "${searchQuery}" stuck in importing → marked failed, re-triggering`,
+            );
+          }
         } else if (existing) {
-          return res.status(200).json({
-            status: 'success',
-            data: [(existing as any)._doc ?? existing],
-            importing: existing.publishedStatus === 'importing',
-          });
+          return sendExisting(existing);
         }
 
         logger.info(

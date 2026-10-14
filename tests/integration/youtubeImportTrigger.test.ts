@@ -102,4 +102,37 @@ describe('YouTube auto-import trigger', () => {
     expect(all.find((d) => d._id.equals(staleId))?.publishedStatus).toBe('failed');
     expect(all.filter((d) => d.publishedStatus === 'importing')).toHaveLength(1);
   });
+
+  it('does not re-trigger when a concurrent request already claimed the stale draft', async () => {
+    const trigger = vi.spyOn(agentService, 'safeTriggerAgent').mockResolvedValue(accepted);
+    const base = { title: QUERY, description: 'd', importQuery: QUERY, priceCategory: 'Free', active: true };
+    // State after the winning request: stale draft claimed, fresh retry in flight.
+    const staleId = (
+      await Course.collection.insertOne({
+        ...base,
+        publishedStatus: 'failed',
+        createdAt: new Date(Date.now() - 60 * 60 * 1000),
+      })
+    ).insertedId;
+    const winnerId = (
+      await Course.collection.insertOne({ ...base, publishedStatus: 'importing', createdAt: new Date() })
+    ).insertedId;
+    // This (losing) request read the stale draft before the winner claimed it.
+    const staleSnapshot = {
+      _id: staleId,
+      publishedStatus: 'importing',
+      createdAt: new Date(Date.now() - 60 * 60 * 1000),
+    };
+    vi.spyOn(Course, 'findOne').mockImplementationOnce(
+      () => ({ setOptions: () => Promise.resolve(staleSnapshot) }) as never,
+    );
+
+    const res = await search();
+
+    expect(res.status).toBe(200);
+    expect(res.body.importing).toBe(true);
+    expect(res.body.data[0]._id).toBe(winnerId.toString());
+    expect(trigger).not.toHaveBeenCalled();
+    expect(await drafts()).toHaveLength(2);
+  });
 });
