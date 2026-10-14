@@ -56,6 +56,20 @@ function sanitizeError(message: string): string {
     .replace(/X-Service-Secret[^,\s]*/gi, 'X-Service-Secret:<redacted>');
 }
 
+// Non-secret response headers that identify which layer rejected a trigger
+// (e.g. a 429 from agent-service vs. a proxy in front of it) and any
+// Retry-After hint. Values are length-capped and stripped of line breaks.
+const DIAGNOSTIC_HEADERS = ['retry-after', 'server', 'content-type'] as const;
+
+export function describeRejection(headers: Record<string, unknown>): string {
+  const parts = DIAGNOSTIC_HEADERS.flatMap((name) => {
+    const value = headers[name];
+    if (typeof value !== 'string' || !value) return [];
+    return [`${name}=${value.replace(/[\r\n]/g, ' ').slice(0, 100)}`];
+  });
+  return parts.length ? ` [${parts.join(', ')}]` : '';
+}
+
 export async function triggerAgent(
   agentType: AgentType,
   payload: Omit<BaseAgentPayload, 'projectId'> & { projectId?: string },
@@ -87,7 +101,8 @@ export async function triggerAgent(
 
     if (res.status !== 202) {
       throw new Error(
-        `Agent trigger failed (${res.status}): ${JSON.stringify(res.data)}`,
+        `Agent trigger failed (${res.status}): ${JSON.stringify(res.data)}` +
+          describeRejection(res.headers as Record<string, unknown>),
       );
     }
 
