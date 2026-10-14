@@ -36,6 +36,9 @@ interface AuthenticatedRequest extends Request {
 
 // Constants
 const COURSE_AUTOCOMPLETE_INDEX_NAME = 'courseAutocomplete';
+// A YouTube import normally finishes in ~30s-2min and the frontend stops
+// polling after ~3min; an 'importing' draft older than this is abandoned.
+const IMPORT_STALE_MS = 10 * 60 * 1000;
 
 interface ReviewDocument {
   rating: number;
@@ -243,7 +246,22 @@ export const getAllCourses = catchAsync(
           publishedStatus: { $in: ['importing', 'published'] },
         }).setOptions({ skipPublishedFilter: true });
 
-        if (existing) {
+        // agent-service never reports a failed run back to us, so a draft that
+        // is still 'importing' past the stale window is treated as dead: mark it
+        // failed and re-trigger below instead of returning it forever.
+        const isStaleImport =
+          existing?.publishedStatus === 'importing' &&
+          Date.now() - new Date(existing.createdAt).getTime() > IMPORT_STALE_MS;
+
+        if (existing && isStaleImport) {
+          logger.warn(
+            `[import] draft ${existing._id} for "${searchQuery}" stuck in importing → marking failed and re-triggering`,
+          );
+          await Course.updateOne(
+            { _id: existing._id },
+            { $set: { publishedStatus: 'failed' } },
+          );
+        } else if (existing) {
           return res.status(200).json({
             status: 'success',
             data: [(existing as any)._doc ?? existing],
@@ -267,7 +285,7 @@ export const getAllCourses = catchAsync(
 
         logger.info(`[import] draft ${draft._id} created (status: importing)`);
 
-        await safeTriggerAgent(
+        const triggered = await safeTriggerAgent(
           'youtube-course-discovery',
           {
             initiatedBy: (req as AuthenticatedRequest).user
@@ -278,6 +296,16 @@ export const getAllCourses = catchAsync(
           },
           `search="${searchQuery}"`,
         );
+
+        if (!triggered) {
+          // Mark the draft failed so the next search retries instead of
+          // returning a draft no agent is working on.
+          await Course.updateOne(
+            { _id: draft._id },
+            { $set: { publishedStatus: 'failed' } },
+          );
+          return next(new AppError('Agent service unavailable. Try again shortly.', 503));
+        }
 
         return res.status(202).json({
           status: 'success',
