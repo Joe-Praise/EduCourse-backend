@@ -22,12 +22,13 @@
     "eqeqeq": ["error", "always", { "null": "ignore" }],
     "@typescript-eslint/no-unused-vars": [
       "error",
-      { "argsIgnorePattern": "^_|^(req|res|next|val)$", "varsIgnorePattern": "^_" }
+      { "argsIgnorePattern": "^_|^(req|res|next|val)$", "varsIgnorePattern": "^_", "caughtErrors": "none" }
     ],
     "@typescript-eslint/no-explicit-any": "warn",
-    // Mongoose's own generics use `{}` for empty query helpers / methods.
-    "@typescript-eslint/ban-types": ["error", { "extendDefaults": true, "types": { "{}": false } }],
-    "@typescript-eslint/no-empty-interface": "off"
+    // Mongoose's own generics use `{}` for empty query helpers / methods, and
+    // empty interfaces are used for declaration merging. (Replaces the v7
+    // `ban-types` `{}` exemption and `no-empty-interface: off`.)
+    "@typescript-eslint/no-empty-object-type": "off"
   },
   "overrides": [
     {
