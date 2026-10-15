@@ -1,18 +1,26 @@
 import '../helpers/mocks.js';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
+import { Types } from 'mongoose';
 import app from '../../src/app.js';
 import * as agentService from '../../src/services/agentService.js';
 import { Course } from '../../src/models/courseModel.js';
+import { User } from '../../src/models/userModel.js';
 import { fakeRedis } from '../helpers/fakeRedis.js';
 import { connectTestDb, clearTestDb, disconnectTestDb } from '../helpers/db.js';
 
 // GET /courses?search=<q> with no catalog match creates an 'importing' draft and
-// dispatches youtube-course-discovery. These cover the paths that used to leave
-// the draft 'importing' forever, which blocked every later search for <q>.
+// dispatches youtube-course-discovery — for signed-in users only. These cover the
+// paths that used to leave the draft 'importing' forever, which blocked every
+// later search for <q>, and the sign-in gate.
 
 const QUERY = 'scaffold inspection';
-const search = () => request(app).get(`/api/v1/courses?search=${encodeURIComponent(QUERY)}`);
+let userId: Types.ObjectId;
+const bearer = () =>
+  `Bearer ${jwt.sign({ id: userId.toString() }, process.env.JWT_SECRET!, { expiresIn: '5m' })}`;
+const searchAnon = () => request(app).get(`/api/v1/courses?search=${encodeURIComponent(QUERY)}`);
+const search = () => searchAnon().set('Authorization', bearer());
 
 const accepted = { accepted: true, projectId: 'building-safety', agentType: 'youtube-course-discovery' };
 
@@ -24,12 +32,40 @@ afterAll(disconnectTestDb);
 beforeEach(async () => {
   await clearTestDb();
   fakeRedis.flushAll();
+  userId = new Types.ObjectId();
+  await User.collection.insertOne({
+    _id: userId, name: 'Learner', email: 'learner@example.com', role: ['user'], active: true,
+  });
 });
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe('YouTube auto-import trigger', () => {
+  it('never starts an import for an anonymous search', async () => {
+    const trigger = vi.spyOn(agentService, 'safeTriggerAgent').mockResolvedValue(accepted);
+
+    const res = await searchAnon();
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.importing).toBeUndefined();
+    expect(trigger).not.toHaveBeenCalled();
+    expect(await drafts()).toHaveLength(0);
+  });
+
+  it('shows anonymous searches a published import but never a draft', async () => {
+    const base = { description: 'd', importQuery: QUERY, priceCategory: 'Free', active: true };
+    await Course.collection.insertOne({ ...base, title: 'Draft', publishedStatus: 'importing', createdAt: new Date() });
+    expect((await searchAnon()).body.data).toEqual([]);
+
+    await Course.collection.insertOne({ ...base, title: 'Live', publishedStatus: 'published', createdAt: new Date() });
+    const res = await searchAnon();
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((c: { title: string }) => c.title)).toEqual(['Live']);
+  });
+
   it('returns 202 with an importing draft when the agent accepts the job', async () => {
     const trigger = vi.spyOn(agentService, 'safeTriggerAgent').mockResolvedValue(accepted);
 
@@ -39,7 +75,7 @@ describe('YouTube auto-import trigger', () => {
     expect(res.body.importing).toBe(true);
     expect(trigger).toHaveBeenCalledWith(
       'youtube-course-discovery',
-      expect.objectContaining({ courseQuery: QUERY }),
+      expect.objectContaining({ courseQuery: QUERY, initiatedBy: `user:${userId.toString()}` }),
       expect.any(String),
     );
     const [draft] = await drafts();
