@@ -8,6 +8,7 @@ import Pagination from '../utils/paginationFeatures.js';
 import { formatDate } from '../utils/timeConverter.js';
 import { createOne, updateOne, deleteOne } from './handlerFactory.js';
 import { safeTriggerAgent } from '../services/agentService.js';
+import { resolveOptionalUser } from '../middlewares/authMiddleware.js';
 
 // Import CommonJS modules
 import { Course } from '../models/courseModel.js';
@@ -139,14 +140,18 @@ export const atlasAutocomplete = catchAsync(
       },
     });
 
+    // Atlas $search bypasses the model's pre-find hook, so re-apply it: search
+    // only surfaces live, published courses — never importing/failed drafts.
+    pipeline.push({
+      $match: { publishedStatus: 'published', active: { $ne: false } },
+    });
+
     pipeline.push({
       $project: {
         score: { $meta: 'searchScore' },
         title: 1,
         imageCover: 1,
         slug: 1,
-        // Surface status so the UI can badge / guard AI-imported drafts that
-        // are still being built (publishedStatus: 'importing').
         publishedStatus: 1,
       },
     });
@@ -233,13 +238,27 @@ export const getAllCourses = catchAsync(
       let doc = paginate.data;
 
       // If zero results and a search query is present, trigger YouTube discovery
-      if (
-        doc.length === 0 &&
-        typeof req.query.search === 'string' &&
-        req.query.search.trim().length >= 3
-      ) {
-        const searchQuery = req.query.search.trim();
+      const searchQuery =
+        typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const wantsImport = doc.length === 0 && searchQuery.length >= 3;
+      // Resolved only on this branch, so plain catalog reads stay auth-free.
+      const importer = wantsImport ? await resolveOptionalUser(req) : null;
 
+      if (wantsImport && !importer) {
+        // Importing is for signed-in users. Anonymous searches can see a
+        // published import for this query (the pre-find hook hides drafts) but
+        // never start one.
+        const published = await Course.findOne({ importQuery: searchQuery });
+        if (published) {
+          return res.status(200).json({
+            status: 'success',
+            data: [published],
+            importing: false,
+          });
+        }
+      }
+
+      if (wantsImport && importer) {
         // Check for an existing draft with this query (avoid duplicate triggers)
         const findImportDraft = () =>
           Course.findOne({
@@ -301,9 +320,7 @@ export const getAllCourses = catchAsync(
         const triggered = await safeTriggerAgent(
           'youtube-course-discovery',
           {
-            initiatedBy: (req as AuthenticatedRequest).user
-              ? `user:${(req as AuthenticatedRequest).user!._id}`
-              : 'api',
+            initiatedBy: `user:${importer._id}`,
             courseId: draft._id.toString(),
             courseQuery: searchQuery,
           },
