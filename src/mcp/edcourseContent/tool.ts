@@ -20,7 +20,7 @@ export type ToolErrorCode =
 
 const ERROR_MESSAGES: Record<ToolErrorCode, string> = {
   INVALID_INPUT:
-    'Arguments must be exactly { courseId: string matching ^[A-Za-z0-9_-]+$ (1-64 chars), moduleIndex: integer 0-50 }.',
+    'Arguments must be exactly { courseId: string matching ^[A-Za-z0-9_-]+$ (1-64 chars), moduleIndex: integer 1-50 }.',
   COURSE_NOT_FOUND: 'Course not found.',
   MODULE_NOT_FOUND: 'Module not found for this course.',
   RESULT_TOO_LARGE: 'Module content exceeds the maximum response size.',

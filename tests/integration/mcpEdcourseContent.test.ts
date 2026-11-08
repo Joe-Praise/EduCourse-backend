@@ -29,6 +29,7 @@ const ids = {
   archived: new Types.ObjectId(),
   softDeleted: new Types.ObjectId(),
   other: new Types.ObjectId(),
+  indexed: new Types.ObjectId(),
   module1: new Types.ObjectId(),
   module2: new Types.ObjectId(),
   module3Deleted: new Types.ObjectId(),
@@ -79,6 +80,7 @@ async function seed(): Promise<void> {
     course(ids.archived, 'archived'),
     course(ids.softDeleted, 'published', false),
     course(ids.other, 'published'),
+    course(ids.indexed, 'published'),
   ]);
   await CourseModule.collection.insertMany([
     { _id: ids.module1, courseId: ids.published, moduleIndex: 1, title: 'Fire doors', section: 'Module 1', active: true },
@@ -88,6 +90,10 @@ async function seed(): Promise<void> {
     { _id: ids.otherModule, courseId: ids.other, moduleIndex: 1, title: 'Other', section: 'Module 1', active: true },
     { courseId: ids.archived, moduleIndex: 1, title: 'Archived', section: 'Module 1', active: true },
     { courseId: ids.softDeleted, moduleIndex: 1, title: 'Deleted', section: 'Module 1', active: true },
+    // Persisted one-based indexes with a gap; distinct titles expose any offset.
+    ...[1, 2, 10].map((i) => ({
+      courseId: ids.indexed, moduleIndex: i, title: `Indexed ${i}`, section: `Module ${i}`, active: true,
+    })),
   ]);
   await Lesson.collection.insertMany([
     // Inserted out of order on purpose.
@@ -178,7 +184,7 @@ describe('MCP transport + discovery', () => {
       type: 'object',
       properties: {
         courseId: { type: 'string', minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' },
-        moduleIndex: { type: 'integer', minimum: 0, maximum: 50 },
+        moduleIndex: { type: 'integer', minimum: 1, maximum: 50 },
       },
       required: ['courseId', 'moduleIndex'],
       additionalProperties: false,
@@ -352,6 +358,39 @@ describe('get_module_lessons data behaviour', () => {
     expect(errorCode(r.text)).toBe('MODULE_NOT_FOUND');
   });
 
+  it('resolves moduleIndex as the persisted one-based index, with no offset', async () => {
+    for (const moduleIndex of [1, 2, 10]) {
+      const r = await call({ courseId: ids.indexed.toString(), moduleIndex });
+      expect(r.isError).toBe(false);
+      expect(JSON.parse(r.text)).toEqual({
+        courseId: ids.indexed.toString(),
+        moduleIndex,
+        moduleTitle: `Indexed ${moduleIndex}`,
+        lessons: [],
+      });
+    }
+  });
+
+  it.each([
+    [0, 'INVALID_INPUT'],
+    [11, 'MODULE_NOT_FOUND'],
+    [50, 'MODULE_NOT_FOUND'],
+    [51, 'INVALID_INPUT'],
+  ])('moduleIndex %i at the contract boundary returns %s', async (moduleIndex, code) => {
+    const r = await call({ courseId: ids.indexed.toString(), moduleIndex });
+    expect(r.isError).toBe(true);
+    expect(errorCode(r.text)).toBe(code);
+  });
+
+  it('rejects moduleIndex 0 before any database read and names the 1-50 range', async () => {
+    const countSpy = vi.spyOn(Course, 'countDocuments');
+    const r = await call({ courseId: ids.published.toString(), moduleIndex: 0 });
+    expect(JSON.parse(r.text)).toEqual({
+      error: { code: 'INVALID_INPUT', message: expect.stringContaining('moduleIndex: integer 1-50') },
+    });
+    expect(countSpy).not.toHaveBeenCalled();
+  });
+
   it('returns an identical COURSE_NOT_FOUND for missing and out-of-boundary courses', async () => {
     const results = await Promise.all(
       [
@@ -434,7 +473,7 @@ describe('get_module_lessons data behaviour', () => {
     const hugeModule = new Types.ObjectId();
     await Course.collection.insertOne(course(huge, 'published'));
     await CourseModule.collection.insertOne({
-      _id: hugeModule, courseId: huge, moduleIndex: 0, title: 'Huge', section: 'Module 0', active: true,
+      _id: hugeModule, courseId: huge, moduleIndex: 1, title: 'Huge', section: 'Module 1', active: true,
     });
     await Lesson.collection.insertMany([
       lesson(hugeModule, huge, 1, 'Long one', '"quoted" \\ '.repeat(20_000)),
@@ -443,7 +482,7 @@ describe('get_module_lessons data behaviour', () => {
     const client = await connectClient();
     const res = (await client.callTool({
       name: 'get_module_lessons',
-      arguments: { courseId: huge.toString(), moduleIndex: 0 },
+      arguments: { courseId: huge.toString(), moduleIndex: 1 },
     })) as { content: unknown };
     await client.close();
     // Measured the way agent-service measures it.

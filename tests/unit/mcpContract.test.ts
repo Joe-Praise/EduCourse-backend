@@ -5,7 +5,7 @@ const RATIFIED_SCHEMA = {
   type: 'object',
   properties: {
     courseId: { type: 'string', minLength: 1, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' },
-    moduleIndex: { type: 'integer', minimum: 0, maximum: 50 },
+    moduleIndex: { type: 'integer', minimum: 1, maximum: 50 },
   },
   required: ['courseId', 'moduleIndex'],
   additionalProperties: false,
@@ -26,8 +26,14 @@ describe('edcourse-content contract', () => {
       courseId: 'course_123',
       moduleIndex: 1,
     });
-    expect(validateInput({ courseId: 'c', moduleIndex: 0 })).not.toBeNull();
+    expect(validateInput({ courseId: 'c', moduleIndex: 10 })).not.toBeNull();
     expect(validateInput({ courseId: 'a'.repeat(64), moduleIndex: 50 })).not.toBeNull();
+  });
+
+  it('enforces exactly the advertised moduleIndex bounds', () => {
+    const { minimum, maximum } = INPUT_SCHEMA.properties.moduleIndex;
+    const accepts = (moduleIndex: number) => validateInput({ courseId: 'c', moduleIndex }) !== null;
+    expect([minimum - 1, minimum, maximum, maximum + 1].map(accepts)).toEqual([false, true, true, false]);
   });
 
   it.each([
@@ -37,6 +43,7 @@ describe('edcourse-content contract', () => {
     ['missing courseId', { moduleIndex: 1 }],
     ['string moduleIndex', { courseId: 'course_123', moduleIndex: '1' }],
     ['fractional moduleIndex', { courseId: 'course_123', moduleIndex: 1.5 }],
+    ['zero moduleIndex (indexes are one-based)', { courseId: 'course_123', moduleIndex: 0 }],
     ['negative moduleIndex', { courseId: 'course_123', moduleIndex: -1 }],
     ['moduleIndex > 50', { courseId: 'c', moduleIndex: 51 }],
     ['NaN moduleIndex', { courseId: 'c', moduleIndex: NaN }],

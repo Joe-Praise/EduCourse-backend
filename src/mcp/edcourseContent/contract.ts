@@ -22,9 +22,10 @@ export const INPUT_SCHEMA = Object.freeze({
       maxLength: 64,
       pattern: COURSE_ID_PATTERN,
     }),
+    // Persisted, one-based (1..n) — not an array offset, so 0 never names a module.
     moduleIndex: Object.freeze({
       type: 'integer',
-      minimum: 0,
+      minimum: 1,
       maximum: 50,
     }),
   }),
@@ -66,7 +67,7 @@ export function validateInput(args: unknown): ModuleLessonsInput | null {
   if (
     typeof moduleIndex !== 'number' ||
     !Number.isInteger(moduleIndex) ||
-    moduleIndex < 0 ||
+    moduleIndex < 1 ||
     moduleIndex > 50
   ) {
     return null;
