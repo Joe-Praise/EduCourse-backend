@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, requirePermission } from '../middlewares/authMiddleware.js';
-import { strictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
+import { createStrictXssSanitizer } from '../middlewares/strictXssSanitizer.js';
 import {
   getAllLessons,
   createLesson,
@@ -10,7 +10,8 @@ import {
 } from '../Controllers/lessonController.js';
 
 const router = express.Router();
-router.use(strictXssSanitizer);
+// Descriptions arrive as builder HTML and are stored as plain text; titles keep their characters.
+router.use(createStrictXssSanitizer({ richText: ['description'], plainText: ['title'] }));
 
 router.use(protect);
 

@@ -69,6 +69,38 @@ export const protect = catchAsync(async (req: Request, res: Response, next: Next
 });
 
 /**
+ * Resolve the caller on a PUBLIC route without rejecting anonymous requests.
+ * Same session/JWT checks as `protect`, but returns null instead of failing and
+ * never writes the session. Call it only where a handler needs the user for one
+ * branch (e.g. starting a YouTube import from the public course search).
+ */
+export const resolveOptionalUser = async (
+  req: Request,
+): Promise<AuthenticatedRequest['user'] | null> => {
+  if (req.session?.user) {
+    return (await User.findById(req.session.user.id)) ?? null;
+  }
+
+  let token: string | undefined;
+  if (req.headers.authorization?.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies?.jwt) {
+    token = req.cookies.jwt;
+  }
+  if (!token) return null;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+    const user = await User.findById(decoded.id);
+    if (!user) return null;
+    if (user.changedPasswordAfter && user.changedPasswordAfter(decoded.iat)) return null;
+    return user;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Role-Based Access Control (RBAC) System with True Resource-Action Enforcement
  * Implements hierarchical permissions with granular resource-action control
  */

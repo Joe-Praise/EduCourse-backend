@@ -58,7 +58,7 @@ courseModuleSchema.virtual('lessons', {
 
 courseModuleSchema.pre<Query<CourseModuleDoc[], CourseModuleDoc>>(/^find/, function (next) {
   this.find({ active: { $ne: false } });
-  this.populate({ path: 'lessons', select: '-__v' });
+  this.populate({ path: 'lessons', select: '-__v', options: { sort: { lessonIndex: 1 } } });
   next();
 });
 
