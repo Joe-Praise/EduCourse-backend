@@ -8,6 +8,7 @@ import Pagination from '../utils/paginationFeatures.js';
 import { formatDate } from '../utils/timeConverter.js';
 import { createOne, updateOne, deleteOne } from './handlerFactory.js';
 import { safeTriggerAgent } from '../services/agentService.js';
+import { resolveOptionalUser } from '../middlewares/authMiddleware.js';
 
 // Import CommonJS modules
 import { Course } from '../models/courseModel.js';
@@ -36,6 +37,9 @@ interface AuthenticatedRequest extends Request {
 
 // Constants
 const COURSE_AUTOCOMPLETE_INDEX_NAME = 'courseAutocomplete';
+// A YouTube import normally finishes in ~30s-2min and the frontend stops
+// polling after ~3min; an 'importing' draft older than this is abandoned.
+const IMPORT_STALE_MS = 10 * 60 * 1000;
 
 interface ReviewDocument {
   rating: number;
@@ -136,14 +140,18 @@ export const atlasAutocomplete = catchAsync(
       },
     });
 
+    // Atlas $search bypasses the model's pre-find hook, so re-apply it: search
+    // only surfaces live, published courses — never importing/failed drafts.
+    pipeline.push({
+      $match: { publishedStatus: 'published', active: { $ne: false } },
+    });
+
     pipeline.push({
       $project: {
         score: { $meta: 'searchScore' },
         title: 1,
         imageCover: 1,
         slug: 1,
-        // Surface status so the UI can badge / guard AI-imported drafts that
-        // are still being built (publishedStatus: 'importing').
         publishedStatus: 1,
       },
     });
@@ -230,25 +238,67 @@ export const getAllCourses = catchAsync(
       let doc = paginate.data;
 
       // If zero results and a search query is present, trigger YouTube discovery
-      if (
-        doc.length === 0 &&
-        typeof req.query.search === 'string' &&
-        req.query.search.trim().length >= 3
-      ) {
-        const searchQuery = req.query.search.trim();
+      const searchQuery =
+        typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const wantsImport = doc.length === 0 && searchQuery.length >= 3;
+      // Resolved only on this branch, so plain catalog reads stay auth-free.
+      const importer = wantsImport ? await resolveOptionalUser(req) : null;
 
-        // Check for an existing draft with this query (avoid duplicate triggers)
-        const existing = await Course.findOne({
-          importQuery: searchQuery,
-          publishedStatus: { $in: ['importing', 'published'] },
-        }).setOptions({ skipPublishedFilter: true });
-
-        if (existing) {
+      if (wantsImport && !importer) {
+        // Importing is for signed-in users. Anonymous searches can see a
+        // published import for this query (the pre-find hook hides drafts) but
+        // never start one.
+        const published = await Course.findOne({ importQuery: searchQuery });
+        if (published) {
           return res.status(200).json({
             status: 'success',
-            data: [(existing as any)._doc ?? existing],
-            importing: existing.publishedStatus === 'importing',
+            data: [published],
+            importing: false,
           });
+        }
+      }
+
+      if (wantsImport && importer) {
+        // Check for an existing draft with this query (avoid duplicate triggers)
+        const findImportDraft = () =>
+          Course.findOne({
+            importQuery: searchQuery,
+            publishedStatus: { $in: ['importing', 'published'] },
+          }).setOptions({ skipPublishedFilter: true });
+        const sendExisting = (course: NonNullable<Awaited<ReturnType<typeof findImportDraft>>>) =>
+          res.status(200).json({
+            status: 'success',
+            data: [(course as any)._doc ?? course],
+            importing: course.publishedStatus === 'importing',
+          });
+
+        const existing = await findImportDraft();
+
+        // agent-service never reports a failed run back to us, so a draft that
+        // is still 'importing' past the stale window is treated as dead: mark it
+        // failed and re-trigger below instead of returning it forever.
+        const isStaleImport =
+          existing?.publishedStatus === 'importing' &&
+          Date.now() - new Date(existing.createdAt).getTime() > IMPORT_STALE_MS;
+
+        if (existing && isStaleImport) {
+          // Conditional on still 'importing' so only one concurrent request
+          // claims the stale draft and re-triggers.
+          const claim = await Course.updateOne(
+            { _id: existing._id, publishedStatus: 'importing' },
+            { $set: { publishedStatus: 'failed' } },
+          );
+          if (claim.modifiedCount === 0) {
+            // Another request already claimed it and started the retry.
+            const current = await findImportDraft();
+            if (current) return sendExisting(current);
+          } else {
+            logger.warn(
+              `[import] draft ${existing._id} for "${searchQuery}" stuck in importing → marked failed, re-triggering`,
+            );
+          }
+        } else if (existing) {
+          return sendExisting(existing);
         }
 
         logger.info(
@@ -267,17 +317,25 @@ export const getAllCourses = catchAsync(
 
         logger.info(`[import] draft ${draft._id} created (status: importing)`);
 
-        await safeTriggerAgent(
+        const triggered = await safeTriggerAgent(
           'youtube-course-discovery',
           {
-            initiatedBy: (req as AuthenticatedRequest).user
-              ? `user:${(req as AuthenticatedRequest).user!._id}`
-              : 'api',
+            initiatedBy: `user:${importer._id}`,
             courseId: draft._id.toString(),
             courseQuery: searchQuery,
           },
           `search="${searchQuery}"`,
         );
+
+        if (!triggered) {
+          // Mark the draft failed so the next search retries instead of
+          // returning a draft no agent is working on.
+          await Course.updateOne(
+            { _id: draft._id },
+            { $set: { publishedStatus: 'failed' } },
+          );
+          return next(new AppError('Agent service unavailable. Try again shortly.', 503));
+        }
 
         return res.status(202).json({
           status: 'success',

@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Weekly npm updates so the lockfile doesn't drift behind security fixes.
+  # Minor/patch bumps are grouped into a single PR; majors arrive separately
+  # because they may need code or config changes. CI gates every PR.
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # Keep the GitHub Actions used in CI current as well.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly

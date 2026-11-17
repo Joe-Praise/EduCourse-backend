@@ -69,7 +69,8 @@ export const getAllModules = catchAsync(async (req: Request, res: Response, next
   let modules: any[] = [];
 
   if (courseId) {
-    modules = await CourseModule.find({ courseId });
+    // Curriculum order: moduleIndex, then creation time as a stable tiebreak.
+    modules = await CourseModule.find({ courseId }).sort({ moduleIndex: 1, createdAt: 1 });
   } else {
     modules = await CourseModule.find();
   }

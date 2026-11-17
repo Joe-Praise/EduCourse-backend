@@ -26,6 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit production dependencies
+        # Fails only on high/critical advisories in packages that ship to
+        # production; dev-tooling advisories are left to Dependabot PRs.
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Typecheck
         run: npm run typecheck
 

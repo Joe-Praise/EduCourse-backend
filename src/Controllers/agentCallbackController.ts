@@ -122,11 +122,26 @@ interface YouTubeImportedCourse {
   subscriberCount?:     number;
 }
 
+/**
+ * Strip a numbering prefix the model writes into module titles ("Module 2:
+ * Foundations" → "Foundations"). Keeps the raw title if nothing would remain.
+ */
+export function cleanModuleTitle(title: string): string {
+  const stripped = title
+    .replace(/^\s*(?:module|section|part|chapter|unit|week|lesson)\s*\d+\s*[:.)\-–—]\s*/i, '')
+    .trim();
+  return stripped || title.trim();
+}
+
+/**
+ * Import one discovered course. `built` is false when its curriculum already
+ * existed — a re-delivered callback — so the caller can skip follow-up work.
+ */
 async function importCourseFromYouTube(
   data: YouTubeImportedCourse,
   existingCourseId: string | null,
   importQuery: string,
-): Promise<string> {
+): Promise<{ courseId: string; built: boolean }> {
   const instructorId = await upsertYouTubeInstructor(data.channelId, data.instructor, {
     avatarUrl:       data.instructorAvatarUrl,
     bio:             data.instructorBio,
@@ -154,49 +169,77 @@ async function importCourseFromYouTube(
     importQuery,
   };
 
-  let courseId: string;
-
-  if (existingCourseId) {
-    const updated = await Course.findByIdAndUpdate(
-      existingCourseId,
-      courseFields,
-      { new: true, runValidators: true },
-    ).setOptions({ skipPublishedFilter: true });
-
-    if (!updated) throw new Error(`Course ${existingCourseId} not found`);
-    courseId = existingCourseId;
-    appEvents.emit(CacheEvent.COURSE.UPDATED, updated);
-  } else {
-    const created = await Course.create({
-      ...courseFields,
-      priceCategory: 'Free',
-    });
-    courseId = created._id.toString();
-    appEvents.emit(CacheEvent.COURSE.CREATED, created);
+  // agent-service delivers callbacks at-least-once (retries, lease reclaim), so
+  // a secondary course whose playlist was already imported is reused, not
+  // created a second time.
+  if (!existingCourseId) {
+    const prior = await Course.findOne({ youtubePlaylistId: data.youtubePlaylistId })
+      .setOptions({ skipPublishedFilter: true });
+    if (prior && (await CourseModule.exists({ courseId: prior._id }))) {
+      return { courseId: prior._id.toString(), built: false };
+    }
   }
 
-  // Build modules + lessons
-  for (const mod of data.modules) {
-    const courseModule = await CourseModule.create({
-      courseId,
-      title:       mod.title,
-      moduleIndex: mod.moduleIndex,
-      section:     `Module ${mod.moduleIndex}`,
-    });
+  // Number modules by their order in the payload, 1..n, and drop any number
+  // the model baked into the title — the curriculum numbers by position.
+  const modules = [...data.modules]
+    .sort((a, b) => a.moduleIndex - b.moduleIndex)
+    .map((m, i) => ({ ...m, moduleIndex: i + 1, title: cleanModuleTitle(m.title) }));
 
-    const lessons = mod.videos.map((v, idx) => ({
-      moduleId:    courseModule._id,
-      courseId,
-      url:         `https://www.youtube.com/watch?v=${v.videoId}`,
-      title:       v.title,
-      duration:    formatDuration(v.durationSeconds),
-      lessonIndex: idx + 1,
-    }));
+  let courseId = '';
+  let built = false;
+  let courseDoc: unknown = null;
 
-    await Lesson.insertMany(lessons);
-  }
+  // Course write + whole curriculum commit together. Writing the course doc
+  // first makes concurrent re-deliveries conflict on it, so only one builds;
+  // the retried one then sees the curriculum and stops.
+  await Course.db.transaction(async (session) => {
+    built = false;
+    if (existingCourseId) {
+      const updated = await Course.findByIdAndUpdate(existingCourseId, courseFields, {
+        new: true,
+        runValidators: true,
+        session,
+      }).setOptions({ skipPublishedFilter: true });
+      if (!updated) throw new Error(`Course ${existingCourseId} not found`);
+      courseId = existingCourseId;
+      courseDoc = updated;
+    } else {
+      const [created] = await Course.create([{ ...courseFields, priceCategory: 'Free' }], { session });
+      courseId = created._id.toString();
+      courseDoc = created;
+    }
 
-  return courseId;
+    if (await CourseModule.exists({ courseId }).session(session)) return;
+
+    for (const mod of modules) {
+      const [courseModule] = await CourseModule.create(
+        [{ courseId, title: mod.title, moduleIndex: mod.moduleIndex, section: `Module ${mod.moduleIndex}` }],
+        { session },
+      );
+
+      const lessons = [...mod.videos]
+        .sort((a, b) => a.position - b.position)
+        .map((v, idx) => ({
+          moduleId:    courseModule._id,
+          courseId,
+          url:         `https://www.youtube.com/watch?v=${v.videoId}`,
+          title:       v.title,
+          duration:    formatDuration(v.durationSeconds),
+          lessonIndex: idx + 1,
+        }));
+
+      await Lesson.insertMany(lessons, { session });
+    }
+    built = true;
+  });
+
+  appEvents.emit(
+    existingCourseId ? CacheEvent.COURSE.UPDATED : CacheEvent.COURSE.CREATED,
+    courseDoc,
+  );
+
+  return { courseId, built };
 }
 
 // ---------------------------------------------------------------------------
@@ -232,8 +275,19 @@ export const handleYouTubeImport = catchAsync(
       // First course updates the original draft; subsequent courses are new docs
       const targetId = i === 0 ? id : null;
       try {
-        const courseId = await importCourseFromYouTube(courseData, targetId, importQuery);
+        const { courseId, built } = await importCourseFromYouTube(courseData, targetId, importQuery);
         importedIds.push(courseId);
+        if (!built) {
+          // Re-delivery of a payload we already imported. The primary course
+          // being built means the whole payload was handled on first delivery.
+          logger.warn(
+            `[import] duplicate delivery for "${courseData.title}" → ${courseId} already has a curriculum; skipped`,
+          );
+          if (i === 0) {
+            return res.status(200).json({ ok: true, imported: 0, duplicate: true, courseIds: importedIds });
+          }
+          continue;
+        }
         const lessonCount = courseData.modules.reduce((s, m) => s + m.videos.length, 0);
         logger.info(
           `[import] ✓ "${courseData.title}" → ${courseId} (${courseData.modules.length} modules, ${lessonCount} lessons)`,
@@ -285,9 +339,12 @@ export const handleYouTubeImport = catchAsync(
     // course shows up immediately on the next courses-page fetch (the per-key
     // list helpers can't reach the query-hashed list keys).
     await cacheManager.removePattern(CacheKeyBuilder.pattern('course'));
+    // Module lists too — a course page opened while the import was running
+    // would otherwise keep serving its cached empty curriculum.
+    await cacheManager.removePattern(CacheKeyBuilder.pattern('module'));
 
     logger.info(
-      `[import] ✔ done — ${importedIds.length} course(s) published for "${importQuery}" (course cache invalidated)`,
+      `[import] ✔ done — ${importedIds.length} course(s) published for "${importQuery}" (course + module cache invalidated)`,
     );
 
     res.status(200).json({ ok: true, imported: importedIds.length, courseIds: importedIds });
