@@ -8,7 +8,7 @@ import { cacheManager } from '../utils/cacheManager.js';
 import { CacheKeyBuilder } from '../utils/cacheKeyBuilder.js';
 import { safeTriggerAgent } from '../services/agentService.js';
 
-import { Course } from '../models/courseModel.js';
+import { Course, type CourseDoc } from '../models/courseModel.js';
 import { CourseModule } from '../models/courseModuleModel.js';
 import { Lesson } from '../models/lessonModel.js';
 import { Instructor } from '../models/instructorModel.js';
@@ -134,14 +134,85 @@ export function cleanModuleTitle(title: string): string {
 }
 
 /**
- * Import one discovered course. `built` is false when its curriculum already
- * existed — a re-delivered callback — so the caller can skip follow-up work.
+ * The oldest published course built from this playlist, other than `excludeId`
+ * (the callback's own draft). "Built" means it has a curriculum; a course still
+ * importing has none and is not a match.
+ */
+async function findBuiltCourseForPlaylist(
+  playlistId: string,
+  excludeId: string | null,
+): Promise<CourseDoc | null> {
+  if (!playlistId) return null;
+  // Pre-find hook: published + active only, so retired drafts never match.
+  const candidates = await Course.find({
+    youtubePlaylistId: playlistId,
+    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+  }).sort({ createdAt: 1 });
+  for (const candidate of candidates) {
+    if (await CourseModule.exists({ courseId: candidate._id })) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Resolve a search's draft to the course that already has its playlist: the
+ * search becomes an alias of that course and the draft is retired. Polling that
+ * search then returns the existing course instead of starting another import.
+ */
+async function retireDraftInto(
+  draftId: string,
+  course: CourseDoc,
+  importQuery: string,
+): Promise<void> {
+  await Course.db.transaction(async (session) => {
+    if (importQuery && importQuery !== course.importQuery) {
+      await Course.updateOne(
+        { _id: course._id },
+        { $addToSet: { importAliases: importQuery } },
+        { session },
+      );
+    }
+    await Course.updateOne(
+      { _id: draftId },
+      { $set: { active: false, publishedStatus: 'archived' } },
+      { session },
+    );
+  });
+  appEvents.emit(CacheEvent.COURSE.UPDATED, course);
+}
+
+interface ImportOutcome {
+  courseId: string;
+  /** The curriculum was written by this call. */
+  built: boolean;
+  /** The playlist was already published as another course (`courseId`). */
+  reused: boolean;
+}
+
+/**
+ * Import one discovered course — at most one published course per playlist.
+ * `built` and `reused` both false means this course's curriculum already
+ * existed (a re-delivered callback), so the caller can skip follow-up work.
  */
 async function importCourseFromYouTube(
   data: YouTubeImportedCourse,
   existingCourseId: string | null,
   importQuery: string,
-): Promise<{ courseId: string; built: boolean }> {
+): Promise<ImportOutcome> {
+  // A draft that already has its curriculum is a re-delivery. Settle it before
+  // the playlist check, which must never retire a course that has been built.
+  if (existingCourseId && (await CourseModule.exists({ courseId: existingCourseId }))) {
+    return { courseId: existingCourseId, built: false, reused: false };
+  }
+
+  // Check the playlist before publishing. Another search (or an earlier
+  // delivery of this callback) may already have built it: reuse that course.
+  const prior = await findBuiltCourseForPlaylist(data.youtubePlaylistId, existingCourseId);
+  if (prior) {
+    if (existingCourseId) await retireDraftInto(existingCourseId, prior, importQuery);
+    return { courseId: prior._id.toString(), built: false, reused: true };
+  }
+
   const instructorId = await upsertYouTubeInstructor(data.channelId, data.instructor, {
     avatarUrl:       data.instructorAvatarUrl,
     bio:             data.instructorBio,
@@ -168,17 +239,6 @@ async function importCourseFromYouTube(
     publishedAt:       new Date(),
     importQuery,
   };
-
-  // agent-service delivers callbacks at-least-once (retries, lease reclaim), so
-  // a secondary course whose playlist was already imported is reused, not
-  // created a second time.
-  if (!existingCourseId) {
-    const prior = await Course.findOne({ youtubePlaylistId: data.youtubePlaylistId })
-      .setOptions({ skipPublishedFilter: true });
-    if (prior && (await CourseModule.exists({ courseId: prior._id }))) {
-      return { courseId: prior._id.toString(), built: false };
-    }
-  }
 
   // Number modules by their order in the payload, 1..n, and drop any number
   // the model baked into the title — the curriculum numbers by position.
@@ -239,7 +299,7 @@ async function importCourseFromYouTube(
     courseDoc,
   );
 
-  return { courseId, built };
+  return { courseId, built, reused: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +323,7 @@ export const handleYouTubeImport = catchAsync(
 
     const importQuery = body.courseQuery ?? '';
     const importedIds: string[] = [];
+    const reusedIds: string[] = [];
 
     logger.info(
       `[import] ← YouTube callback for course ${id}: ${body.courses.length} course(s) discovered for "${importQuery}"`,
@@ -275,7 +336,16 @@ export const handleYouTubeImport = catchAsync(
       // First course updates the original draft; subsequent courses are new docs
       const targetId = i === 0 ? id : null;
       try {
-        const { courseId, built } = await importCourseFromYouTube(courseData, targetId, importQuery);
+        const { courseId, built, reused } = await importCourseFromYouTube(courseData, targetId, importQuery);
+        if (reused) {
+          // Already published from an earlier search: nothing new to chain, but
+          // keep going — the rest of the payload may still be new.
+          reusedIds.push(courseId);
+          logger.info(
+            `[import] "${courseData.title}" (playlist ${courseData.youtubePlaylistId}) already published as ${courseId}; reused, not copied`,
+          );
+          continue;
+        }
         importedIds.push(courseId);
         if (!built) {
           // Re-delivery of a payload we already imported. The primary course
@@ -325,7 +395,7 @@ export const handleYouTubeImport = catchAsync(
       }
     }
 
-    if (importedIds.length === 0) {
+    if (importedIds.length === 0 && reusedIds.length === 0) {
       // Surface the actual per-course reason(s) instead of a blank "all failed".
       return next(
         new AppError(
@@ -344,10 +414,15 @@ export const handleYouTubeImport = catchAsync(
     await cacheManager.removePattern(CacheKeyBuilder.pattern('module'));
 
     logger.info(
-      `[import] ✔ done — ${importedIds.length} course(s) published for "${importQuery}" (course + module cache invalidated)`,
+      `[import] ✔ done — ${importedIds.length} course(s) published, ${reusedIds.length} reused for "${importQuery}" (course + module cache invalidated)`,
     );
 
-    res.status(200).json({ ok: true, imported: importedIds.length, courseIds: importedIds });
+    res.status(200).json({
+      ok: true,
+      imported: importedIds.length,
+      reused: reusedIds.length,
+      courseIds: [...importedIds, ...reusedIds],
+    });
   },
 );
 

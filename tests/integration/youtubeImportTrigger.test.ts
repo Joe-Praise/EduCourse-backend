@@ -66,6 +66,26 @@ describe('YouTube auto-import trigger', () => {
     expect(res.body.data.map((c: { title: string }) => c.title)).toEqual(['Live']);
   });
 
+  it('returns the course a search was resolved to by playlist, and never starts an import', async () => {
+    const trigger = vi.spyOn(agentService, 'safeTriggerAgent').mockResolvedValue(accepted);
+    // Imported for another search; this search later found the same playlist.
+    const liveId = (
+      await Course.collection.insertOne({
+        title: 'Working at Height Essentials', description: 'd', importQuery: 'height safety',
+        importAliases: [QUERY], publishedStatus: 'published', priceCategory: 'Free', active: true,
+        createdAt: new Date(),
+      })
+    ).insertedId;
+
+    for (const res of [await search(), await searchAnon()]) {
+      expect(res.status).toBe(200);
+      expect(res.body.importing).toBe(false);
+      expect(res.body.data.map((c: { _id: string }) => c._id)).toEqual([liveId.toString()]);
+    }
+    expect(trigger).not.toHaveBeenCalled();
+    expect(await drafts()).toHaveLength(0);
+  });
+
   it('returns 202 with an importing draft when the agent accepts the job', async () => {
     const trigger = vi.spyOn(agentService, 'safeTriggerAgent').mockResolvedValue(accepted);
 
@@ -159,9 +179,7 @@ describe('YouTube auto-import trigger', () => {
       publishedStatus: 'importing',
       createdAt: new Date(Date.now() - 60 * 60 * 1000),
     };
-    vi.spyOn(Course, 'findOne').mockImplementationOnce(
-      () => ({ setOptions: () => Promise.resolve(staleSnapshot) }) as never,
-    );
+    vi.spyOn(Course, 'findByImportQuery').mockResolvedValueOnce(staleSnapshot as never);
 
     const res = await search();
 
