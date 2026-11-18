@@ -248,7 +248,7 @@ export const getAllCourses = catchAsync(
         // Importing is for signed-in users. Anonymous searches can see a
         // published import for this query (the pre-find hook hides drafts) but
         // never start one.
-        const published = await Course.findOne({ importQuery: searchQuery });
+        const published = await Course.findByImportQuery(searchQuery);
         if (published) {
           return res.status(200).json({
             status: 'success',
@@ -259,12 +259,10 @@ export const getAllCourses = catchAsync(
       }
 
       if (wantsImport && importer) {
-        // Check for an existing draft with this query (avoid duplicate triggers)
+        // Check for an existing draft with this query (avoid duplicate triggers).
+        // Also matches a course this search was resolved to by playlist (alias).
         const findImportDraft = () =>
-          Course.findOne({
-            importQuery: searchQuery,
-            publishedStatus: { $in: ['importing', 'published'] },
-          }).setOptions({ skipPublishedFilter: true });
+          Course.findByImportQuery(searchQuery, ['importing', 'published']);
         const sendExisting = (course: NonNullable<Awaited<ReturnType<typeof findImportDraft>>>) =>
           res.status(200).json({
             status: 'success',

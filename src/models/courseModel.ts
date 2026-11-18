@@ -142,6 +142,13 @@ const courseSchema = new Schema(
     importQuery: {
       type: String,
     },
+    // Other searches that discovered this course's playlist. Set when a later
+    // import finds the playlist already published, so that search resolves to
+    // this course instead of publishing a copy (or re-triggering an import).
+    importAliases: {
+      type: [String],
+      default: undefined,
+    },
     active: {
       type: Boolean,
       default: true,
@@ -186,6 +193,11 @@ interface CourseStatics {
     this: CourseModel,
     instructorId: string,
   ): Promise<CourseDoc[]>;
+  findByImportQuery(
+    this: CourseModel,
+    query: string,
+    statuses?: string[],
+  ): Promise<CourseDoc | null>;
 }
 
 type CourseDoc = HydratedDocument<CourseType, CourseMethods>;
@@ -225,9 +237,27 @@ courseSchema.statics.findAllByInstructor = function (instructorId: string) {
 };
 
 /**
+ * The course a YouTube-import search resolves to: matched on the search that
+ * created it (`importQuery`) or on a later search that found the same playlist
+ * (`importAliases`). Without `statuses` only published courses match (pre-find
+ * hook); with them, those statuses match, drafts included.
+ */
+courseSchema.statics.findByImportQuery = function (query: string, statuses?: string[]) {
+  const byQuery = { $or: [{ importQuery: query }, { importAliases: query }] };
+  if (!statuses) return this.findOne(byQuery);
+  return this.findOne({ ...byQuery, publishedStatus: { $in: statuses } }).setOptions({
+    skipPublishedFilter: true,
+  });
+};
+
+/**
  * Indexes
  */
 courseSchema.index({ title: 'text' });
+courseSchema.index({ importQuery: 1 });
+courseSchema.index({ importAliases: 1 });
+// Non-unique on purpose: existing duplicate imports would fail a unique build.
+courseSchema.index({ youtubePlaylistId: 1 });
 
 /**
  * Virtuals
