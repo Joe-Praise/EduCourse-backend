@@ -5,7 +5,12 @@ import type { RawLesson } from './contentAccess.js';
  *
  * Size is measured the way agent-service measures it: JSON.stringify of the
  * whole MCP `content` array, so the payload JSON is escaped twice. The target
- * is 6,000 chars; the hard ceiling (agent-service's own) is 8,000.
+ * is 6,500 chars; the hard ceiling (agent-service's own) is 8,000.
+ *
+ * 6,500 (raised from 6,000 in 4I.60) lets a typical three-lesson module with
+ * ~2,000-char descriptions return whole: "System Design Mastery" Module 1, with
+ * its approved descriptions, measures 6,139 at the first ladder step and was
+ * cut to 1,500-char bodies at 6,000.
  *
  * Strategy: cap every string field, then step down a fixed ladder (bodies
  * first, then lesson titles) until the target fits. Lessons are never dropped.
@@ -13,7 +18,7 @@ import type { RawLesson } from './contentAccess.js';
  * instead of a silently shortened module.
  */
 
-export const TARGET_CHARS = 6_000;
+export const TARGET_CHARS = 6_500;
 export const HARD_CEILING_CHARS = 8_000;
 export const MODULE_TITLE_CAP = 200;
 
