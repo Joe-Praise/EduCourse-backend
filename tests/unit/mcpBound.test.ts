@@ -1,11 +1,19 @@
+import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import {
   boundModuleLessons,
   HARD_CEILING_CHARS,
   measure,
   TARGET_CHARS,
+  toContent,
   truncateField,
 } from '../../src/mcp/edcourseContent/bound.js';
+import {
+  CANONICAL_COURSE_ID,
+  CANONICAL_LESSONS,
+  CANONICAL_MODULE_INDEX,
+  CANONICAL_MODULE_TITLE,
+} from '../fixtures/edcourseCanonicalLessons.js';
 
 const lessons = (n: number, body: string, title = 'Lesson') =>
   Array.from({ length: n }, (_, i) => ({ title: `${title} ${i + 1}`, description: body }));
@@ -108,5 +116,88 @@ describe('boundModuleLessons', () => {
       { title: '', body: '' },
       { title: '', body: '' },
     ]);
+  });
+});
+
+// Succor normalizes a tool result as JSON.stringify(result.content) and caps that
+// string at 8,000 chars (agent-service tool-execution.ts MAX_TOOL_RESULT_CHARS).
+const SUCCOR_RESULT_CAP = 8_000;
+const MARKER = /…\[truncated \d+ chars\]/;
+const canonicalRaw = () => CANONICAL_LESSONS.map((l) => ({ title: l.title, description: l.description }));
+
+describe('content target (4I.60)', () => {
+  it('targets 6,500 chars under an unchanged 8,000 hard ceiling', () => {
+    expect(TARGET_CHARS).toBe(6_500);
+    expect(HARD_CEILING_CHARS).toBe(8_000);
+    expect(HARD_CEILING_CHARS).toBeLessThanOrEqual(SUCCOR_RESULT_CAP);
+  });
+
+  it('uses the verbatim 4I.59 canonical descriptions', () => {
+    expect(CANONICAL_LESSONS.map((l) => l.sha256)).toEqual([
+      '2ea087a2d950c7d641bbd274cc1f6bbd8ca79d0ba268f49c4167528c7455dfa3',
+      '960f4615be71e2e272660d1b72b0486af66494bb5368eaca246f011d7bc1e45f',
+      '0858197c2d4802b2e05f5d7edebf0ec1f5fdea587b7dbbac7e2c7eca07fca10a',
+    ]);
+    for (const l of CANONICAL_LESSONS) {
+      expect(createHash('sha256').update(l.description, 'utf8').digest('hex')).toBe(l.sha256);
+    }
+  });
+
+  describe('System Design Mastery Module 1 with its canonical descriptions', () => {
+    const result = () =>
+      boundModuleLessons(CANONICAL_COURSE_ID, CANONICAL_MODULE_INDEX, CANONICAL_MODULE_TITLE, canonicalRaw());
+
+    it('returns every description whole, unmodified, with no truncation marker', () => {
+      const r = result();
+      expect(r.kind).toBe('ok');
+      if (r.kind !== 'ok') return;
+      expect(r.truncated).toBe(false);
+      expect(r.text).not.toMatch(MARKER);
+      expect(JSON.parse(r.text).lessons.map((l: { body: string }) => l.body)).toEqual(
+        CANONICAL_LESSONS.map((l) => l.description),
+      );
+    });
+
+    it('keeps lesson order, lesson titles and module context unchanged', () => {
+      const parsed = JSON.parse(okText(result()));
+      expect(parsed.courseId).toBe(CANONICAL_COURSE_ID);
+      expect(parsed.moduleIndex).toBe(CANONICAL_MODULE_INDEX);
+      expect(parsed.moduleTitle).toBe(CANONICAL_MODULE_TITLE);
+      expect(parsed.lessons.map((l: { title: string }) => l.title)).toEqual(CANONICAL_LESSONS.map((l) => l.title));
+    });
+
+    it('fits the 6,500 target but not the former 6,000 one (the regression this fixes)', () => {
+      const r = result();
+      if (r.kind !== 'ok') throw new Error('expected ok');
+      expect(r.size).toBeLessThanOrEqual(TARGET_CHARS);
+      expect(r.size).toBeGreaterThan(6_000);
+    });
+
+    it("stays under Succor's 8,000-char cap, measured exactly as Succor measures it", () => {
+      const r = result();
+      if (r.kind !== 'ok') throw new Error('expected ok');
+      const normalized = JSON.stringify(toContent(r.text));
+      expect(normalized.length).toBe(r.size);
+      expect(normalized.length).toBeLessThan(SUCCOR_RESULT_CAP);
+    });
+  });
+
+  it('still truncates visibly, as exact prefixes, once a module exceeds the target', () => {
+    const raw = [...canonicalRaw(), { title: 'Fourth lesson', description: CANONICAL_LESSONS[0].description }];
+    const r = boundModuleLessons(CANONICAL_COURSE_ID, CANONICAL_MODULE_INDEX, CANONICAL_MODULE_TITLE, raw);
+    expect(r.kind).toBe('ok');
+    if (r.kind !== 'ok') return;
+    expect(r.truncated).toBe(true);
+    expect(r.size).toBeLessThanOrEqual(TARGET_CHARS);
+    const parsed = JSON.parse(r.text);
+    expect(parsed.lessons.map((l: { title: string }) => l.title)).toEqual(raw.map((l) => l.title));
+    let marked = 0;
+    parsed.lessons.forEach((l: { body: string }, i: number) => {
+      const m = MARKER.exec(l.body);
+      if (!m) return expect(l.body).toBe(raw[i].description);
+      marked += 1;
+      expect(raw[i].description.startsWith(l.body.slice(0, m.index))).toBe(true);
+    });
+    expect(marked).toBeGreaterThan(0);
   });
 });

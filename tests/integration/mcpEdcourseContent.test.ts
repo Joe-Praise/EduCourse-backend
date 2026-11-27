@@ -14,6 +14,12 @@ import { Lesson } from '../../src/models/lessonModel.js';
 import { User } from '../../src/models/userModel.js';
 import { Instructor } from '../../src/models/instructorModel.js';
 import { connectTestDb, disconnectTestDb } from '../helpers/db.js';
+import { TARGET_CHARS } from '../../src/mcp/edcourseContent/bound.js';
+import {
+  CANONICAL_LESSONS,
+  CANONICAL_MODULE_INDEX,
+  CANONICAL_MODULE_TITLE,
+} from '../fixtures/edcourseCanonicalLessons.js';
 
 const TOKEN = process.env.EDCOURSE_MCP_BEARER_TOKEN as string;
 const PATH = '/api/v1/mcp/edcourse-content';
@@ -486,11 +492,48 @@ describe('get_module_lessons data behaviour', () => {
     })) as { content: unknown };
     await client.close();
     // Measured the way agent-service measures it.
-    expect(JSON.stringify(res.content).length).toBeLessThanOrEqual(6000);
+    expect(JSON.stringify(res.content).length).toBeLessThanOrEqual(TARGET_CHARS);
     const text = (res.content as { text: string }[])[0].text;
     const parsed = JSON.parse(text);
     expect(parsed.lessons).toHaveLength(2);
     for (const l of parsed.lessons) expect(l.body).toMatch(/…\[truncated \d+ chars\]$/);
+  });
+
+  it('returns the canonical System Design Module 1 descriptions whole through the MCP client', async () => {
+    const sdCourse = new Types.ObjectId();
+    const sdModule = new Types.ObjectId();
+    await Course.collection.insertOne(course(sdCourse, 'published'));
+    await CourseModule.collection.insertOne({
+      _id: sdModule,
+      courseId: sdCourse,
+      moduleIndex: CANONICAL_MODULE_INDEX,
+      title: CANONICAL_MODULE_TITLE,
+      section: 'Module 1',
+      active: true,
+    });
+    // Inserted in reverse so the order assertion proves the lessonIndex sort.
+    await Lesson.collection.insertMany(
+      [...CANONICAL_LESSONS].reverse().map((l) => lesson(sdModule, sdCourse, l.lessonIndex, l.title, l.description)),
+    );
+    const client = await connectClient();
+    const res = (await client.callTool({
+      name: 'get_module_lessons',
+      arguments: { courseId: sdCourse.toString(), moduleIndex: CANONICAL_MODULE_INDEX },
+    })) as { isError?: boolean; content: { type: string; text: string }[] };
+    await client.close();
+
+    expect(res.isError).not.toBe(true);
+    // Succor normalizes the result as JSON.stringify(content) and caps it at 8,000.
+    const normalized = JSON.stringify(res.content);
+    expect(normalized.length).toBeLessThanOrEqual(TARGET_CHARS);
+    expect(normalized.length).toBeLessThan(8_000);
+    expect(normalized).not.toMatch(/…\[truncated \d+ chars\]/);
+    expect(JSON.parse(res.content[0].text)).toEqual({
+      courseId: sdCourse.toString(),
+      moduleIndex: CANONICAL_MODULE_INDEX,
+      moduleTitle: CANONICAL_MODULE_TITLE,
+      lessons: CANONICAL_LESSONS.map((l) => ({ title: l.title, body: l.description })),
+    });
   });
 });
 
